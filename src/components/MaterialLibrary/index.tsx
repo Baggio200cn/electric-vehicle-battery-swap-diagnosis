@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -42,7 +42,8 @@ import {
   Language as WebIcon,
   Image as ImageIcon,
   AutoFixHigh as AutoIntegrateIcon,
-  LibraryBooks as KnowledgeIcon
+  LibraryBooks as KnowledgeIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 interface Material {
@@ -115,6 +116,55 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
     '故障案例'
   ];
 
+  // 加载已保存的素材库数据
+  useEffect(() => {
+    console.log('加载素材库数据...');
+    const savedMaterials = localStorage.getItem('materialLibrary');
+    if (savedMaterials) {
+      try {
+        const parsedMaterials = JSON.parse(savedMaterials);
+        console.log('从localStorage加载了', parsedMaterials.length, '个素材');
+        setMaterials(parsedMaterials);
+        onMaterialsChange?.(parsedMaterials);
+      } catch (error) {
+        console.error('加载素材库数据失败:', error);
+      }
+    } else {
+      console.log('localStorage中没有素材库数据');
+    }
+
+    // 加载自动集成设置
+    const savedAutoIntegration = localStorage.getItem('autoIntegrationEnabled');
+    if (savedAutoIntegration !== null) {
+      setAutoIntegrationEnabled(JSON.parse(savedAutoIntegration));
+    }
+  }, [onMaterialsChange]);
+
+  // 保存素材库数据到localStorage
+  const saveMaterialsToStorage = (materialsToSave: Material[]) => {
+    try {
+      localStorage.setItem('materialLibrary', JSON.stringify(materialsToSave));
+    } catch (error) {
+      console.error('保存素材库数据失败:', error);
+    }
+  };
+
+  // 保存自动集成设置
+  const saveAutoIntegrationSetting = (enabled: boolean) => {
+    try {
+      localStorage.setItem('autoIntegrationEnabled', JSON.stringify(enabled));
+    } catch (error) {
+      console.error('保存自动集成设置失败:', error);
+    }
+  };
+
+  // 更新素材库并保存
+  const updateMaterials = (newMaterials: Material[]) => {
+    setMaterials(newMaterials);
+    onMaterialsChange?.(newMaterials);
+    saveMaterialsToStorage(newMaterials);
+  };
+
   // 自动分类算法
   const autoCategorizeMaterial = (material: Material): { category: string; tags: string[] } => {
     const content = (material.content || material.description || material.name).toLowerCase();
@@ -183,13 +233,12 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
       onAddToKnowledgeBase?.(document);
       
       // 更新素材状态
-      setMaterials(prev => prev.map(m => 
+      const updatedMaterials = materials.map(m => 
         m.id === material.id 
           ? { ...m, category, tags, autoIntegrated: true }
           : m
-      ));
-      
-      onMaterialsChange?.(materials);
+      );
+      updateMaterials(updatedMaterials);
     } else {
       // 显示确认对话框
       setIntegrationDialog({
@@ -208,13 +257,12 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
       const document = convertToKnowledgeDocument(material, suggestedCategory, suggestedTags);
       onAddToKnowledgeBase?.(document);
       
-      setMaterials(prev => prev.map(m => 
+      const updatedMaterials = materials.map(m => 
         m.id === material.id 
           ? { ...m, category: suggestedCategory, tags: suggestedTags, autoIntegrated: true }
           : m
-      ));
-      
-      onMaterialsChange?.(materials);
+      );
+      updateMaterials(updatedMaterials);
     }
     
     setIntegrationDialog({
@@ -281,11 +329,8 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
       description: `类型: ${result.type}\n来源: 互联网搜索\n内容: ${result.content}`
     };
     
-    setMaterials(prev => {
-      const updated = [...prev, newMaterial];
-      onMaterialsChange?.(updated);
-      return updated;
-    });
+    const updatedMaterials = [...materials, newMaterial];
+    updateMaterials(updatedMaterials);
     
     setSearchResults(prev => prev.filter(r => r.title !== result.title));
     
@@ -295,8 +340,10 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'text' | 'audio' | 'video' | 'image') => {
     const files = event.target.files;
+    console.log('文件上传触发:', { type, fileCount: files?.length });
     if (files) {
       Array.from(files).forEach(file => {
+        console.log('处理文件:', { name: file.name, type: file.type, size: file.size });
         const newMaterial: Material = {
           id: Date.now().toString() + Math.random(),
           name: file.name,
@@ -311,10 +358,13 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
           const reader = new FileReader();
           reader.onload = (e) => {
             newMaterial.imagePreview = e.target?.result as string;
-            setMaterials(prev => {
-              const updated = [...prev, newMaterial];
-              onMaterialsChange?.(updated);
-              return updated;
+            // 使用回调函数确保获取最新状态
+            setMaterials(prevMaterials => {
+              const updatedMaterials = [...prevMaterials, newMaterial];
+              console.log('图片文件添加成功:', newMaterial.name, '总数:', updatedMaterials.length);
+              onMaterialsChange?.(updatedMaterials);
+              saveMaterialsToStorage(updatedMaterials);
+              return updatedMaterials;
             });
             
             // 自动集成到知识库
@@ -326,10 +376,13 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
           const reader = new FileReader();
           reader.onload = (e) => {
             newMaterial.content = e.target?.result as string;
-            setMaterials(prev => {
-              const updated = [...prev, newMaterial];
-              onMaterialsChange?.(updated);
-              return updated;
+            // 使用回调函数确保获取最新状态
+            setMaterials(prevMaterials => {
+              const updatedMaterials = [...prevMaterials, newMaterial];
+              console.log('文本文件添加成功:', newMaterial.name, '总数:', updatedMaterials.length);
+              onMaterialsChange?.(updatedMaterials);
+              saveMaterialsToStorage(updatedMaterials);
+              return updatedMaterials;
             });
             
             // 自动集成到知识库
@@ -337,16 +390,41 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
           };
           reader.readAsText(file);
         } else {
-          setMaterials(prev => {
-            const updated = [...prev, newMaterial];
-            onMaterialsChange?.(updated);
-            return updated;
+          // 对于音频和视频文件，直接添加
+          setMaterials(prevMaterials => {
+            const updatedMaterials = [...prevMaterials, newMaterial];
+            console.log('音频/视频文件添加成功:', newMaterial.name, '总数:', updatedMaterials.length);
+            onMaterialsChange?.(updatedMaterials);
+            saveMaterialsToStorage(updatedMaterials);
+            return updatedMaterials;
           });
           
           // 自动集成到知识库
           integrateToKnowledgeBase(newMaterial);
         }
       });
+    }
+    
+    // 清空文件输入值，允许重复上传同一文件
+    event.target.value = '';
+  };
+
+  // 处理自动集成设置变化
+  const handleAutoIntegrationToggle = (enabled: boolean) => {
+    setAutoIntegrationEnabled(enabled);
+    saveAutoIntegrationSetting(enabled);
+  };
+
+  // 删除素材
+  const handleDeleteMaterial = (materialId: string) => {
+    const updatedMaterials = materials.filter(m => m.id !== materialId);
+    updateMaterials(updatedMaterials);
+  };
+
+  // 清空素材库
+  const handleClearAll = () => {
+    if (window.confirm('确定要清空所有素材吗？此操作不可恢复。')) {
+      updateMaterials([]);
     }
   };
 
@@ -368,7 +446,8 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
       audio: materials.filter(m => m.type === 'audio').length,
       video: materials.filter(m => m.type === 'video').length,
       image: materials.filter(m => m.type === 'image').length,
-      web: materials.filter(m => m.type === 'web').length
+      web: materials.filter(m => m.type === 'web').length,
+      integrated: materials.filter(m => m.autoIntegrated).length
     };
   };
 
@@ -458,6 +537,19 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                   />
                 </Grid>
               </Grid>
+              {stats.total > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Button 
+                    variant="outlined" 
+                    color="error" 
+                    size="small"
+                    startIcon={<DeleteIcon />}
+                    onClick={handleClearAll}
+                  >
+                    清空所有
+                  </Button>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -472,7 +564,7 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                 control={
                   <Switch
                     checked={autoIntegrationEnabled}
-                    onChange={(e) => setAutoIntegrationEnabled(e.target.checked)}
+                    onChange={(e) => handleAutoIntegrationToggle(e.target.checked)}
                     color="primary"
                   />
                 }
@@ -943,4 +1035,4 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
   );
 };
 
-export default MaterialLibrary; 
+export default MaterialLibrary;
