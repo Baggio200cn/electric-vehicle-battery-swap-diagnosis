@@ -6,7 +6,7 @@
 
 An intelligent fault diagnosis system for electric vehicle battery swap stations, featuring knowledge graph visualization, decision tree diagnosis, and multi-modal input analysis.
 
-[🚀 Live Demo](#demo) • [📚 Documentation](#documentation) • [🤝 Contributing](#contributing)
+[🚀 Live Demo](https://baggio200cn.github.io/electric-vehicle-battery-swap-diagnosis) • [📚 Documentation](#documentation) • [🤝 Contributing](#contributing)
 
 </div>
 
