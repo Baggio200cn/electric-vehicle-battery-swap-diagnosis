@@ -1,0 +1,103 @@
+.video-input {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.stream-controls {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.stream-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  background-color: #4a90e2;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.stream-button:hover {
+  background-color: #357abd;
+}
+
+.stream-button.streaming {
+  background-color: #e24a4a;
+}
+
+.stream-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.file-upload {
+  position: relative;
+  flex: 1;
+}
+
+.file-upload input[type="file"] {
+  display: none;
+}
+
+.upload-button {
+  display: inline-block;
+  padding: 10px 20px;
+  background-color: #4caf50;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.upload-button:hover {
+  background-color: #45a049;
+}
+
+.upload-button.uploading {
+  background-color: #45a049;
+  cursor: not-allowed;
+}
+
+.stream-error {
+  color: #e24a4a;
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #ffe6e6;
+}
+
+.video-preview {
+  width: 100%;
+  max-width: 800px;
+  margin: 20px auto;
+  position: relative;
+}
+
+.video-preview video {
+  width: 100%;
+  border-radius: 10px;
+  background-color: #000;
+}
+
+.video-preview video.active {
+  border: 2px solid #4a90e2;
+}
+
+.upload-progress {
+  width: 100%;
+  height: 4px;
+  background-color: #f0f0f0;
+  border-radius: 2px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #4caf50;
+  transition: width 0.3s ease;
+} 
