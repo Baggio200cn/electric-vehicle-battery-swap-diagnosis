@@ -1,0 +1,82 @@
+# 机器视觉文献获取系统配置文件
+
+# 下载配置
+download:
+  path: "./data/papers"  # 论文下载路径
+  max_concurrent: 5      # 最大并发下载数
+  timeout: 30           # 下载超时时间（秒）
+  retry_times: 3        # 重试次数
+
+# 数据源配置
+sources:
+  arxiv:
+    base_url: "http://arxiv.org"
+    api_url: "http://export.arxiv.org/api/query"
+    enabled: true
+    
+  ieee:
+    base_url: "https://ieeexplore.ieee.org"
+    enabled: false  # 需要API密钥
+    
+  google_scholar:
+    base_url: "https://scholar.google.com"
+    enabled: false  # 需要处理反爬虫
+    
+  researchgate:
+    base_url: "https://www.researchgate.net"
+    enabled: false
+    
+  cnki:
+    base_url: "https://www.cnki.net"
+    enabled: false
+
+# 关键词配置
+keywords:
+  计算机视觉基础:
+    - "computer vision"
+    - "image processing"
+    - "pattern recognition"
+    - "feature extraction"
+    - "object detection"
+    
+  深度学习视觉:
+    - "deep learning computer vision"
+    - "convolutional neural network"
+    - "CNN vision"
+    - "neural network image"
+    - "deep learning object detection"
+    
+  工业视觉检测:
+    - "industrial vision"
+    - "machine vision inspection"
+    - "automated visual inspection"
+    - "industrial image processing"
+    - "quality control vision"
+    
+  医学图像分析:
+    - "medical image analysis"
+    - "medical imaging"
+    - "radiology AI"
+    - "diagnostic imaging"
+    - "biomedical image processing"
+
+# 文件过滤配置
+filters:
+  min_file_size: 100000    # 最小文件大小（字节）
+  max_file_size: 50000000  # 最大文件大小（字节）
+  allowed_formats: ["pdf", "docx", "doc"]
+  
+# 日志配置
+logging:
+  level: "INFO"
+  file: "logs/crawler.log"
+  max_size: "10 MB"
+  backup_count: 5
+
+# 报告配置
+reports:
+  enabled: true
+  format: "html"
+  output_path: "./data/reports"
+  include_summary: true
+  include_charts: true
