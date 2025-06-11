@@ -1,7 +1,29 @@
 {
-  "name": "power-station-fault-diagnosis",
-  "version": "0.1.0",
-  "private": true,
+  "name": "electric-vehicle-battery-swap-diagnosis",
+  "version": "1.0.0",
+  "description": "An intelligent fault diagnosis system for electric vehicle battery swap stations, featuring knowledge graph visualization, decision tree diagnosis, and multi-modal input analysis.",
+  "homepage": "https://github.com/Baggio200cn/electric-vehicle-battery-swap-diagnosis",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Baggio200cn/electric-vehicle-battery-swap-diagnosis.git"
+  },
+  "keywords": [
+    "electric-vehicle",
+    "battery-swap",
+    "fault-diagnosis",
+    "knowledge-graph",
+    "react",
+    "typescript",
+    "material-ui",
+    "machine-learning",
+    "ai"
+  ],
+  "author": "Baggio200cn",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Baggio200cn/electric-vehicle-battery-swap-diagnosis/issues"
+  },
+  "private": false,
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
@@ -24,7 +46,9 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src --ext .ts,.tsx",
+    "format": "prettier --write src/**/*.{ts,tsx,css,json}"
   },
   "eslintConfig": {
     "extends": [
