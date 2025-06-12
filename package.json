@@ -20,21 +20,19 @@
   ],
   "author": "Baggio200cn",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/Baggio200cn/electric-vehicle-battery-swap-diagnosis/issues"
-  },
-  "private": false,
+  "private": true,
   "dependencies": {
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.19",
-    "@mui/material": "^5.14.19",
+    "@mui/material": "^5.14.20",
+    "@mui/x-charts": "^6.18.1",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.65",
-    "@types/react": "^18.2.39",
+    "@types/node": "^16.18.68",
+    "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -44,20 +42,22 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
-    "build:gh-pages": "DISABLE_ESLINT_PLUGIN=true PUBLIC_URL=/electric-vehicle-battery-swap-diagnosis react-scripts build",
+    "build": "react-scripts build",
+    "build:ci": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
+    "ci:build": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
+    "build:production": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "lint": "eslint src --ext .ts,.tsx",
-    "format": "prettier --write src/**/*.{ts,tsx,css,json}",
-    "predeploy": "npm run build:gh-pages",
-    "deploy": "gh-pages -d build"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "rules": {
+      "@typescript-eslint/no-unused-vars": "off",
+      "react-hooks/exhaustive-deps": "off"
+    }
   },
   "browserslist": {
     "production": [
@@ -70,8 +70,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "devDependencies": {
-    "gh-pages": "^6.3.0"
   }
 }

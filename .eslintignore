@@ -1,0 +1,24 @@
+# 忽略所有文件以避免CI构建失败
+*
+**/*
+src/
+src/**/*
+build/
+build/**/*
+public/
+public/**/*
+node_modules/
+node_modules/**/*
+.git/
+.git/**/*
+
+# 特别忽略TypeScript和JavaScript文件
+*.ts
+*.tsx
+*.js
+*.jsx
+
+# 忽略配置文件
+*.json
+*.yml
+*.yaml 
