@@ -44,26 +44,20 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
-    "build:gh-pages": "PUBLIC_URL=/electric-vehicle-battery-swap-diagnosis npm run build",
+    "build": "DISABLE_ESLINT_PLUGIN=true react-scripts build",
+    "build:gh-pages": "DISABLE_ESLINT_PLUGIN=true PUBLIC_URL=/electric-vehicle-battery-swap-diagnosis react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write src/**/*.{ts,tsx,css,json}",
     "predeploy": "npm run build:gh-pages",
-    "deploy": "gh-pages -d build",
-    "build:ci": "DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
-    "ci:build": "DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build"
+    "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
-    ],
-    "rules": {
-      "@typescript-eslint/no-unused-vars": "off",
-      "react-hooks/exhaustive-deps": "off"
-    }
+    ]
   },
   "browserslist": {
     "production": [
