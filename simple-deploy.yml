@@ -25,12 +25,12 @@ jobs:
           node-version: '18'
           cache: 'npm'
           
-      - run: npm ci
-      
-      - run: npm run build
-        env:
-          CI: false
-          GENERATE_SOURCEMAP: false
+      - name: Clean install dependencies
+        run: |
+          npm ci --legacy-peer-deps
+          
+      - name: Build with GitHub-specific script
+        run: npm run build:github
         
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
