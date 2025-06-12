@@ -1,60 +1,675 @@
-name: Deploy to GitHub Pages
+import React, { useState, useEffect } from 'react';
+import './App.css';
+import TextInput from './components/TextInput';
+import VideoInput from './components/VideoInput';
+import ImageInput from './components/ImageInput';
+import AudioInput from './components/AudioInput';
+import MaterialLibrary from './components/MaterialLibrary';
+import KnowledgeGraph from './components/KnowledgeGraph';
+import SmartDiagnosis from './components/SmartDiagnosis';
+import DecisionTree from './components/DecisionTree';
+import { analyzeText, analyzeVideo } from './api/faultAnalysis';
+import DiagnosisResult from './components/DiagnosisResult';
+import { 
+  CircularProgress, 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Container, 
+  Box, 
+  Tabs, 
+  Tab, 
+  Paper, 
+  Alert,
+  Snackbar,
+  IconButton,
+  Menu,
+  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Card,
+  CardContent,
+  Avatar,
+  Chip,
+  Grid
+} from '@mui/material';
+import { 
+  Settings as SettingsIcon,
+  Close as CloseIcon,
+  Upload as UploadIcon,
+  Delete as DeleteIcon
+} from '@mui/icons-material';
+import { 
+  DiagnosisResult as DiagnosisResultType, 
+  Statistics,
+  MaterialItem,
+  CustomLogo
+} from './types';
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
 
-# Allow only one concurrent deployment
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`simple-tabpanel-${index}`}
+      aria-labelledby={`simple-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 
-jobs:
-  # Build job
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+function a11yProps(index: number) {
+  return {
+    id: `simple-tab-${index}`,
+    'aria-controls': `simple-tabpanel-${index}`,
+  };
+}
+
+function App() {
+  const [tabValue, setTabValue] = useState(0);
+  const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResultType | null>(null);
+  const [statistics, setStatistics] = useState<Statistics>({
+    totalFrames: 0,
+    analyzedFrames: 0,
+    abnormalFrames: 0,
+    abnormalRatio: 0,
+    duration: 0
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [analysisType, setAnalysisType] = useState<'text' | 'video' | 'image' | 'audio'>('text');
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'warning' | 'info'>('info');
+
+  // 知识库相关状态
+  const [knowledgeDocuments, setKnowledgeDocuments] = useState<any[]>([]);
+  const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
+
+  // 素材库相关状态
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+
+  // Logo和设置相关状态
+  const [selectedLogo, setSelectedLogo] = useState<string>('default');
+  const [customLogos, setCustomLogos] = useState<CustomLogo[]>([]);
+  const [settingsMenuAnchor, setSettingsMenuAnchor] = useState<null | HTMLElement>(null);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+
+  // 预设Logo选项
+  const presetLogos = [
+    { id: 'default', name: '默认Logo', icon: '🔋' },
+    { id: 'battery', name: '电池图标', icon: '⚡' },
+    { id: 'gear', name: '齿轮图标', icon: '⚙️' },
+    { id: 'tools', name: '工具图标', icon: '🔧' },
+    { id: 'car', name: '汽车图标', icon: '🚗' }
+  ];
+
+  // 从localStorage加载设置
+  useEffect(() => {
+    const savedLogo = localStorage.getItem('selectedLogo');
+    const savedCustomLogos = localStorage.getItem('customLogos');
+    
+    if (savedLogo) {
+      setSelectedLogo(savedLogo);
+    }
+    
+    if (savedCustomLogos) {
+      try {
+        setCustomLogos(JSON.parse(savedCustomLogos));
+      } catch (error) {
+        console.error('加载自定义Logo失败:', error);
+      }
+    }
+  }, []);
+
+  // 保存Logo设置
+  const saveLogoSettings = () => {
+    localStorage.setItem('selectedLogo', selectedLogo);
+    localStorage.setItem('customLogos', JSON.stringify(customLogos));
+  };
+
+  // 处理Logo选择
+  const handleLogoSelect = (logoId: string) => {
+    setSelectedLogo(logoId);
+  };
+
+  // 处理自定义Logo上传
+  const handleCustomLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // 验证文件类型
+      if (!file.type.startsWith('image/')) {
+        showSnackbar('请选择图片文件', 'error');
+        return;
+      }
+      
+      // 验证文件大小 (2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        showSnackbar('图片文件不能超过2MB', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        const newLogo: CustomLogo = {
+          id: `custom_${Date.now()}`,
+          name: file.name,
+          dataUrl: result,
+          uploadDate: new Date().toISOString()
+        };
         
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-        
-      - name: Build project
-        run: npm run build
-        env:
-          CI: false
-          PUBLIC_URL: /electric-vehicle-battery-swap-diagnosis
-          
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-        
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./build
+        setCustomLogos(prev => [...prev, newLogo]);
+        showSnackbar('Logo上传成功', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
-  # Deployment job
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4 
+  // 删除自定义Logo
+  const handleDeleteCustomLogo = (logoId: string) => {
+    setCustomLogos(prev => prev.filter(logo => logo.id !== logoId));
+    if (selectedLogo === logoId) {
+      setSelectedLogo('default');
+    }
+    showSnackbar('Logo已删除', 'info');
+  };
+
+  // 获取当前Logo显示
+  const getCurrentLogoDisplay = () => {
+    if (selectedLogo === 'default') return '🔋';
+    
+    const presetLogo = presetLogos.find(logo => logo.id === selectedLogo);
+    if (presetLogo) return presetLogo.icon;
+    
+    const customLogo = customLogos.find(logo => logo.id === selectedLogo);
+    if (customLogo) {
+      return <img src={customLogo.dataUrl} alt={customLogo.name} style={{ width: 32, height: 32, borderRadius: 4 }} />;
+    }
+    
+    return '🔋';
+  };
+
+  const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  // 处理文本分析
+  const handleTextAnalysis = async (text: string) => {
+    setLoading(true);
+    setError(null);
+    setAnalysisType('text');
+    
+    try {
+      const result = await analyzeText(text);
+      setDiagnosisResult(result);
+      showSnackbar('文本分析完成', 'success');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '文本分析失败';
+      setError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 处理视频分析
+  const handleVideoAnalysis = async (videoFile: File) => {
+    setLoading(true);
+    setError(null);
+    setAnalysisType('video');
+    
+    try {
+      const result = await analyzeVideo(videoFile);
+      setDiagnosisResult(result.diagnosis);
+      setStatistics(result.statistics);
+      showSnackbar('视频分析完成', 'success');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '视频分析失败';
+      setError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 处理图片分析
+  const handleImageAnalysis = async (analysisData: any, files: File[]) => {
+    setLoading(true);
+    setError(null);
+    setAnalysisType('image');
+    
+    try {
+      const result = convertImageAnalysisToResult(analysisData, files);
+      setDiagnosisResult(result);
+      showSnackbar('图片分析完成', 'success');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '图片分析失败';
+      setError(errorMessage);
+      showSnackbar(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 转换ImageInput的分析结果为标准格式
+  const convertImageAnalysisToResult = (analysisData: any, files: File[]): DiagnosisResultType => {
+    const { individualAnalyses, overallSummary, prioritizedSolutions } = analysisData;
+    
+    // 转换异常检测结果
+    const anomalies = individualAnalyses.flatMap((analysis: any, index: number) => 
+      analysis.detectedAnomalies.map((anomaly: any) => ({
+        type: anomaly.type,
+        severity: anomaly.severity,
+        confidence: anomaly.confidence,
+        location: anomaly.location,
+        description: anomaly.description,
+        frameIndex: index,
+        timestamp: index * 1000, // 假设每张图片间隔1秒
+        boundingBox: anomaly.boundingBox
+      }))
+    );
+
+    // 转换解决方案
+    const solutions = prioritizedSolutions.map((solution: any) => ({
+      id: solution.id,
+      title: solution.title,
+      description: solution.description,
+      priority: solution.priority,
+      estimatedTime: solution.estimatedTime,
+      difficulty: solution.difficulty,
+      tools: solution.tools || [],
+      steps: solution.steps || [],
+      safetyNotes: solution.safetyNotes || []
+    }));
+
+    return {
+      id: `img_analysis_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      analysisType: 'image',
+      summary: overallSummary.summary,
+      severity: overallSummary.overallSeverity,
+      confidence: overallSummary.averageConfidence,
+      anomalies: anomalies,
+      solutions: solutions,
+      recommendations: overallSummary.recommendations || [],
+      metadata: {
+        totalImages: files.length,
+        imageNames: files.map(f => f.name),
+        analysisMethod: 'multi-image-analysis'
+      }
+    };
+  };
+
+  // 处理知识库更新
+  const handleKnowledgeUpdate = (documents: any[]) => {
+    setKnowledgeDocuments(documents);
+  };
+
+  // 处理素材库更新
+  const handleMaterialsUpdate = (newMaterials: MaterialItem[]) => {
+    setMaterials(newMaterials);
+  };
+
+  // 设置菜单处理
+  const handleSettingsClick = (event: React.MouseEvent<HTMLElement>) => {
+    setSettingsMenuAnchor(event.currentTarget);
+  };
+
+  const handleSettingsClose = () => {
+    setSettingsMenuAnchor(null);
+  };
+
+  const handleSettingsDialogOpen = () => {
+    setSettingsDialogOpen(true);
+    handleSettingsClose();
+  };
+
+  const handleSettingsDialogClose = () => {
+    setSettingsDialogOpen(false);
+  };
+
+  const handleSaveSettings = () => {
+    saveLogoSettings();
+    handleSettingsDialogClose();
+    showSnackbar('设置已保存', 'success');
+  };
+
+  return (
+    <div className="App">
+      <AppBar position="static" sx={{ backgroundColor: '#1976d2' }}>
+        <Toolbar>
+          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+            {typeof getCurrentLogoDisplay() === 'string' ? (
+              <Typography variant="h6" component="span" sx={{ mr: 1 }}>
+                {getCurrentLogoDisplay()}
+              </Typography>
+            ) : (
+              getCurrentLogoDisplay()
+            )}
+          </Box>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            电动汽车换电站智能诊断系统
+          </Typography>
+          <IconButton
+            color="inherit"
+            onClick={handleSettingsClick}
+            sx={{ ml: 2 }}
+          >
+            <SettingsIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+
+      {/* 设置菜单 */}
+      <Menu
+        anchorEl={settingsMenuAnchor}
+        open={Boolean(settingsMenuAnchor)}
+        onClose={handleSettingsClose}
+      >
+        <MenuItem onClick={handleSettingsDialogOpen}>
+          系统设置
+        </MenuItem>
+      </Menu>
+
+      {/* 设置对话框 */}
+      <Dialog 
+        open={settingsDialogOpen} 
+        onClose={handleSettingsDialogClose}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          系统设置
+          <IconButton
+            onClick={handleSettingsDialogClose}
+            sx={{ position: 'absolute', right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Logo设置
+            </Typography>
+            
+            {/* 当前Logo显示 */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle2" gutterBottom>
+                  当前Logo
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {typeof getCurrentLogoDisplay() === 'string' ? (
+                    <Typography variant="h4">{getCurrentLogoDisplay()}</Typography>
+                  ) : (
+                    getCurrentLogoDisplay()
+                  )}
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedLogo === 'default' ? '默认Logo' : 
+                     presetLogos.find(l => l.id === selectedLogo)?.name ||
+                     customLogos.find(l => l.id === selectedLogo)?.name ||
+                     '未知Logo'}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* 预设Logo选择 */}
+            <Typography variant="subtitle1" gutterBottom>
+              预设Logo
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              {presetLogos.map((logo) => (
+                <Grid item xs={6} sm={4} md={3} key={logo.id}>
+                  <Card 
+                    sx={{ 
+                      cursor: 'pointer',
+                      border: selectedLogo === logo.id ? 2 : 1,
+                      borderColor: selectedLogo === logo.id ? 'primary.main' : 'divider'
+                    }}
+                    onClick={() => handleLogoSelect(logo.id)}
+                  >
+                    <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                      <Typography variant="h4" sx={{ mb: 1 }}>
+                        {logo.icon}
+                      </Typography>
+                      <Typography variant="caption">
+                        {logo.name}
+                      </Typography>
+                      {selectedLogo === logo.id && (
+                        <Chip 
+                          label="使用中" 
+                          size="small" 
+                          color="primary" 
+                          sx={{ mt: 1 }}
+                        />
+                      )}
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
+            {/* 自定义Logo上传 */}
+            <Typography variant="subtitle1" gutterBottom>
+              自定义Logo
+            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <input
+                accept="image/*"
+                style={{ display: 'none' }}
+                id="logo-upload"
+                type="file"
+                onChange={handleCustomLogoUpload}
+              />
+              <label htmlFor="logo-upload">
+                <Button
+                  variant="outlined"
+                  component="span"
+                  startIcon={<UploadIcon />}
+                >
+                  上传自定义Logo
+                </Button>
+              </label>
+              <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+                支持JPG、PNG、GIF格式，文件大小不超过2MB
+              </Typography>
+            </Box>
+
+            {/* 自定义Logo列表 */}
+            {customLogos.length > 0 && (
+              <Grid container spacing={2}>
+                {customLogos.map((logo) => (
+                  <Grid item xs={6} sm={4} md={3} key={logo.id}>
+                    <Card 
+                      sx={{ 
+                        cursor: 'pointer',
+                        border: selectedLogo === logo.id ? 2 : 1,
+                        borderColor: selectedLogo === logo.id ? 'primary.main' : 'divider'
+                      }}
+                    >
+                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                        <Avatar
+                          src={logo.dataUrl}
+                          alt={logo.name}
+                          sx={{ width: 48, height: 48, mx: 'auto', mb: 1 }}
+                        />
+                        <Typography variant="caption" display="block" noWrap>
+                          {logo.name}
+                        </Typography>
+                        <Box sx={{ mt: 1, display: 'flex', gap: 1, justifyContent: 'center' }}>
+                          <Button
+                            size="small"
+                            variant={selectedLogo === logo.id ? "contained" : "outlined"}
+                            onClick={() => handleLogoSelect(logo.id)}
+                          >
+                            {selectedLogo === logo.id ? '使用中' : '使用'}
+                          </Button>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleDeleteCustomLogo(logo.id)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleSettingsDialogClose}>
+            取消
+          </Button>
+          <Button onClick={handleSaveSettings} variant="contained">
+            保存设置
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Container maxWidth="xl" sx={{ mt: 2 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        <Paper elevation={3}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs value={tabValue} onChange={handleTabChange} aria-label="诊断系统标签页">
+              <Tab label="文本诊断" {...a11yProps(0)} />
+              <Tab label="视频分析" {...a11yProps(1)} />
+              <Tab label="图像识别" {...a11yProps(2)} />
+              <Tab label="音频分析" {...a11yProps(3)} />
+              <Tab label="素材库" {...a11yProps(4)} />
+              <Tab label="知识图谱" {...a11yProps(5)} />
+              <Tab label="智能诊断" {...a11yProps(6)} />
+              <Tab label="决策树" {...a11yProps(7)} />
+            </Tabs>
+          </Box>
+
+          <TabPanel value={tabValue} index={0}>
+            <TextInput onAnalysis={handleTextAnalysis} loading={loading} />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <VideoInput onAnalysis={handleVideoAnalysis} loading={loading} />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={2}>
+            <ImageInput onAnalysis={handleImageAnalysis} loading={loading} />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <AudioInput loading={loading} />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={4}>
+            <MaterialLibrary 
+              materials={materials}
+              onMaterialsUpdate={handleMaterialsUpdate}
+            />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={5}>
+            <KnowledgeGraph 
+              documents={knowledgeDocuments}
+              onDocumentsUpdate={handleKnowledgeUpdate}
+            />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={6}>
+            <SmartDiagnosis />
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={7}>
+            <DecisionTree />
+          </TabPanel>
+        </Paper>
+
+        {/* 诊断结果显示 */}
+        {diagnosisResult && (
+          <Box sx={{ mt: 3 }}>
+            <DiagnosisResult 
+              result={diagnosisResult} 
+              statistics={statistics}
+              analysisType={analysisType}
+            />
+          </Box>
+        )}
+
+        {/* 加载指示器 */}
+        {loading && (
+          <Box 
+            sx={{ 
+              position: 'fixed', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%', 
+              backgroundColor: 'rgba(0, 0, 0, 0.5)', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              zIndex: 9999 
+            }}
+          >
+            <Box sx={{ textAlign: 'center', color: 'white' }}>
+              <CircularProgress color="inherit" size={60} />
+              <Typography variant="h6" sx={{ mt: 2 }}>
+                正在分析中，请稍候...
+              </Typography>
+            </Box>
+          </Box>
+        )}
+      </Container>
+
+      {/* 消息提示 */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </div>
+  );
+}
+
+export default App; 
