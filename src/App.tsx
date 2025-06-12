@@ -32,6 +32,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+
   Card,
   CardContent,
   CardActions,
@@ -57,8 +58,6 @@ import {
 import { 
   DiagnosisResult as DiagnosisResultType, 
   Statistics,
-  TextAnalysisResponse,
-  VideoAnalysisResponse,
   MaterialItem,
   CustomLogo
 } from './types';
@@ -197,12 +196,14 @@ function App() {
         const savedLogo = localStorage.getItem('selectedLogo');
         if (savedLogo) {
           setSelectedLogo(savedLogo);
+          console.log('已加载保存的Logo设置:', savedLogo);
         }
-
+        
         const savedCustomLogos = localStorage.getItem('customLogos');
         if (savedCustomLogos) {
           const parsedLogos = JSON.parse(savedCustomLogos);
           setCustomLogos(parsedLogos);
+          console.log('已加载自定义Logo:', parsedLogos.length, '个');
         }
       } catch (error) {
         console.error('加载Logo设置失败:', error);
@@ -217,113 +218,121 @@ function App() {
     try {
       localStorage.setItem('selectedLogo', logo);
       localStorage.setItem('customLogos', JSON.stringify(customLogos));
+      console.log('Logo设置已保存:', logo);
     } catch (error) {
       console.error('保存Logo设置失败:', error);
     }
   };
 
-  // 处理Logo选择
+  // 选择Logo
   const handleLogoSelect = (logoPath: string) => {
     setSelectedLogo(logoPath);
     saveLogoSettings(logoPath, customLogos);
+    console.log('Logo已切换为:', logoPath);
   };
 
-  // 处理自定义Logo上传
+  // 上传自定义Logo
   const handleCustomLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // 验证文件类型
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-      if (!allowedTypes.includes(file.type)) {
-        alert('请选择JPG、PNG或GIF格式的图片文件');
-        return;
-      }
-
-      // 验证文件大小（限制为2MB）
-      if (file.size > 2 * 1024 * 1024) {
-        alert('图片文件大小不能超过2MB');
-        return;
-      }
-
+    if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const result = e.target?.result as string;
-        const newLogo: CustomLogo = {
-          id: `custom_${Date.now()}`,
-          name: file.name,
-          path: result,
-          uploadDate: new Date().toISOString()
-        };
-
+                 const newLogo: CustomLogo = {
+           id: `custom_${Date.now()}`,
+           name: file.name,
+           url: result,
+           position: 'top-right',
+           size: 'medium',
+           opacity: 0.9,
+           path: result
+         };
+        
         const updatedCustomLogos = [...customLogos, newLogo];
         setCustomLogos(updatedCustomLogos);
         setSelectedLogo(result);
         saveLogoSettings(result, updatedCustomLogos);
+        
+        console.log('自定义Logo已上传并设置为当前Logo');
       };
       reader.readAsDataURL(file);
+    } else {
+      setError('请选择有效的图片文件');
     }
+    
+    // 清空input值，允许重复上传同一文件
+    event.target.value = '';
   };
 
   // 删除自定义Logo
   const handleDeleteCustomLogo = (logoId: string) => {
+    const logoToDelete = customLogos.find(logo => logo.id === logoId);
+    if (!logoToDelete) return;
+    
     const updatedCustomLogos = customLogos.filter(logo => logo.id !== logoId);
     setCustomLogos(updatedCustomLogos);
     
-    // 如果删除的是当前选中的Logo，切换到默认Logo
-    const deletedLogo = customLogos.find(logo => logo.id === logoId);
-    if (deletedLogo && selectedLogo === deletedLogo.path) {
+    // 如果删除的是当前使用的Logo，切换到默认Logo
+    if (selectedLogo === logoToDelete.url) {
       setSelectedLogo('/logo.png');
       saveLogoSettings('/logo.png', updatedCustomLogos);
     } else {
       saveLogoSettings(selectedLogo, updatedCustomLogos);
     }
+    
+    console.log('自定义Logo已删除:', logoId);
   };
 
-  // 预设Logo选项
-  const presetLogos = [
-    { name: '默认标识', path: '/logo.png' },
-    { name: '电池图标', path: '🔋' },
-    { name: '闪电图标', path: '⚡' },
-    { name: '齿轮图标', path: '⚙️' },
-    { name: '工具图标', path: '🔧' },
-    { name: '汽车图标', path: '🚗' }
-  ];
+  // 加载素材库数据
+  useEffect(() => {
+    const savedMaterials = localStorage.getItem('materials');
+    if (savedMaterials) {
+      try {
+        const parsedMaterials = JSON.parse(savedMaterials);
+        setMaterials(parsedMaterials);
+      } catch (error) {
+        console.error('加载素材库失败:', error);
+      }
+    }
+  }, []);
 
-  // 诊断日志保存函数
+  // 自动保存诊断日志到素材库
   const saveDiagnosisLog = async (logData: {
     type: 'text' | 'image' | 'video' | 'audio' | 'multi-image';
     files?: File[];
     result: DiagnosisResultType;
   }) => {
     try {
-      const logEntry = {
-        id: `log_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        type: logData.type,
+      const timestamp = new Date();
+      const logId = `diagnosis_${Date.now()}`;
+      
+      // 创建素材库条目
+      const materialItem: MaterialItem = {
+        id: logId,
+        name: `${getTypeDisplayName(logData.type)}诊断报告 - ${formatDate(timestamp)}`,
+        type: 'diagnosis',
+        size: JSON.stringify(logData.result).length,
+        uploadDate: timestamp,
+        tags: [
+          '诊断日志', 
+          logData.type, 
+          logData.result.severity || 'medium'
+        ],
         description: generateLogDescription(logData),
-        result: logData.result,
-        fileCount: logData.files?.length || 0,
-        fileNames: logData.files?.map(f => f.name) || [],
-        severity: logData.result.severity,
-        faultType: logData.result.faultType,
-        confidence: logData.result.confidence
+        diagnosisResult: logData.result
       };
 
-      // 获取现有日志
-      const existingLogs = JSON.parse(localStorage.getItem('diagnosisLogs') || '[]');
-      
-      // 添加新日志（最新的在前面）
-      const updatedLogs = [logEntry, ...existingLogs];
-      
-      // 限制日志数量（保留最近100条）
-      const limitedLogs = updatedLogs.slice(0, 100);
+      // 更新素材库
+      const updatedMaterials = [materialItem, ...materials];
+      setMaterials(updatedMaterials);
       
       // 保存到localStorage
-      localStorage.setItem('diagnosisLogs', JSON.stringify(limitedLogs));
+      localStorage.setItem('materials', JSON.stringify(updatedMaterials));
       
-      console.log('诊断日志已保存:', logEntry);
+      console.log('✅ 诊断日志已自动保存到素材库');
+      
     } catch (error) {
-      console.error('保存诊断日志失败:', error);
+      console.error('❌ 保存诊断日志失败:', error);
     }
   };
 
@@ -333,18 +342,26 @@ function App() {
     files?: File[];
     result: DiagnosisResultType;
   }): string => {
-    const typeDisplayName = getTypeDisplayName(logData.type);
-    const fileInfo = logData.files && logData.files.length > 0 
-      ? `${logData.files.length}个文件` 
-      : '文本输入';
-    const severityText = getSeverityText(logData.result.severity);
+    const typeText = getTypeDisplayName(logData.type);
+    const severityText = getSeverityText(logData.result.severity || 'medium');
+    const fileName = logData.files ? logData.files[0].name : '文本输入';
     
-    return `${typeDisplayName}诊断 - ${fileInfo} - ${severityText}`;
+    let description = `${typeText}诊断 - ${fileName} - ${severityText}`;
+    
+    if (logData.result.solutions && logData.result.solutions.length > 0) {
+      description += `\n解决方案: ${logData.result.solutions.join(', ')}`;
+    }
+    
+    if (logData.result.description) {
+      description += `\n分析描述: ${logData.result.description}`;
+    }
+    
+    return description;
   };
 
   // 获取类型显示名称
   const getTypeDisplayName = (type: string): string => {
-    const typeMap: { [key: string]: string } = {
+    const typeMap: Record<string, string> = {
       'text': '文本',
       'image': '图片',
       'video': '视频',
@@ -356,7 +373,7 @@ function App() {
 
   // 获取严重程度文本
   const getSeverityText = (severity: string): string => {
-    const severityMap: { [key: string]: string } = {
+    const severityMap: Record<string, string> = {
       'low': '轻微',
       'medium': '中等',
       'high': '严重'
@@ -366,252 +383,281 @@ function App() {
 
   // 格式化日期
   const formatDate = (date: Date): string => {
-    return date.toLocaleString('zh-CN', {
+    return new Intl.DateTimeFormat('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
-    });
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(date);
   };
 
-  // 处理素材库变化
+  // 处理素材变化
   const handleMaterialsChange = (newMaterials: MaterialItem[]) => {
     setMaterials(newMaterials);
+    localStorage.setItem('materialsLibrary', JSON.stringify(newMaterials));
   };
 
   // 处理知识库文档变化
   const handleKnowledgeDocumentsChange = (documents: KnowledgeDocument[]) => {
     setKnowledgeDocuments(documents);
+    // 保存到localStorage
     localStorage.setItem('knowledgeBase', JSON.stringify(documents));
+    console.log('知识库已更新，文档数量:', documents.length);
   };
 
-  // 显示知识图谱
-  const handleShowKnowledgeGraph = (show: boolean = true) => {
-    setShowKnowledgeGraph(show);
-  };
 
-  // 添加到知识库的处理函数
+
+  // 添加文档到知识库
   const handleAddToKnowledgeBase = (document: KnowledgeDocument) => {
+    const existingDoc = knowledgeDocuments.find(doc => doc.title === document.title);
+    if (existingDoc) {
+      console.warn('文档已存在于知识库中:', document.title);
+      return;
+    }
+    
     const updatedDocuments = [...knowledgeDocuments, document];
-    setKnowledgeDocuments(updatedDocuments);
-    localStorage.setItem('knowledgeBase', JSON.stringify(updatedDocuments));
+    handleKnowledgeDocumentsChange(updatedDocuments);
+    console.log('文档已添加到知识库:', document.title);
   };
 
-  // 清理诊断结果的函数
-  const clearDiagnosisResult = () => {
-    setDiagnosisResult(null);
-    setError(null);
-    setStatistics({
-      totalFrames: 0,
-      analyzedFrames: 0,
-      abnormalFrames: 0,
-      abnormalRatio: 0,
-      duration: 0
-    });
-  };
-
-  // 处理文本分析
   const handleTextAnalysis = async (text: string) => {
+    if (!text.trim()) return;
+    
     setLoading(true);
     setError(null);
     setAnalysisType('text');
     
     try {
-      const result = await analyzeText(text);
-      setDiagnosisResult(result);
+      const response = await analyzeText(text);
+      setDiagnosisResult(response.analysis);
+      if (response.statistics) {
+        setStatistics(response.statistics);
+      }
       
-      // 保存诊断日志
+      // 自动保存诊断日志
       await saveDiagnosisLog({
         type: 'text',
-        result: result
+        result: response.analysis
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
+      
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '分析失败');
+      console.error('文本分析错误:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 处理视频分析
   const handleVideoAnalysis = async (file: File) => {
     setLoading(true);
     setError(null);
     setAnalysisType('video');
     
     try {
-      const result = await analyzeVideo(file);
-      setDiagnosisResult(result);
+      const response = await analyzeVideo(file);
+      setDiagnosisResult(response.analysis);
+      setStatistics(response.statistics);
       
-      // 保存诊断日志
+      // 自动保存诊断日志
       await saveDiagnosisLog({
         type: 'video',
         files: [file],
-        result: result
+        result: response.analysis
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
+      
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '分析失败');
+      console.error('视频分析错误:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 处理音频分析
   const handleAudioAnalysis = async (file: File) => {
     setLoading(true);
     setError(null);
     setAnalysisType('audio');
     
     try {
-      // 模拟音频分析
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // 模拟音频分析，返回符合DiagnosisResult类型的结果
       const result: DiagnosisResultType = {
-        faultType: '音频异常',
-        severity: 'medium',
-        confidence: 0.75,
-        description: `音频文件 ${file.name} 分析完成。检测到设备运行声音异常，可能存在机械振动或电机异响问题。`,
+        faultType: '音频异常检测',
+        confidence: 0.78,
         solutions: [
-          '检查设备机械部件是否松动',
-          '检查电机运行状态',
-          '进行设备润滑保养',
-          '联系专业技术人员进行详细检查'
+          '检查音频设备连接',
+          '调整音频采样率',
+          '检查环境噪音水平',
+          '验证音频驱动程序'
         ],
-        timestamp: new Date().toISOString(),
-        analysisDetails: {
-          audioFeatures: {
-            duration: 30,
-            sampleRate: 44100,
-            channels: 2,
-            peakFrequency: 1200,
-            averageAmplitude: 0.65
-          },
-          detectedAnomalies: [
-            { type: '高频噪声', confidence: 0.8, timeRange: '5-10s' },
-            { type: '振动异响', confidence: 0.7, timeRange: '15-20s' }
-          ]
-        }
+        description: '检测到音频信号异常，可能存在设备故障',
+        severity: 'medium'
       };
       
       setDiagnosisResult(result);
       
-      // 保存诊断日志
+      // 设置音频分析统计
+      const audioStats: Statistics = {
+        totalFrames: 1,
+        analyzedFrames: 1,
+        abnormalFrames: result.confidence > 0.7 ? 1 : 0,
+        abnormalRatio: result.confidence,
+        duration: 10 // 假设音频时长10秒
+      };
+      setStatistics(audioStats);
+      
+      // 自动保存诊断日志
       await saveDiagnosisLog({
         type: 'audio',
         files: [file],
-        result: result
+        result
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '音频分析失败');
+      
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '分析失败');
+      console.error('音频分析错误:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 处理图片上传和分析
+  // 更新图片上传处理函数 - 使用ImageInput组件的详细分析
   const handleImageUpload = async (files: File[], analysisData?: any) => {
+    if (files.length === 0) return;
+    
     setLoading(true);
     setError(null);
-    setAnalysisType(files.length > 1 ? 'multi-image' : 'image');
-    
+    setAnalysisType('image');
+
     try {
-      let result: DiagnosisResultType;
+      let imageAnalysisResult: DiagnosisResultType;
       
       if (analysisData) {
-        // 使用ImageInput组件提供的分析数据
-        result = convertImageAnalysisToResult(analysisData, files);
+        // 使用ImageInput组件提供的详细分析数据
+        imageAnalysisResult = convertImageAnalysisToResult(analysisData, files);
       } else {
-        // 执行高级图片分析
-        result = await performAdvancedImageAnalysis(files);
+        // 后备分析方法
+        imageAnalysisResult = await performAdvancedImageAnalysis(files);
       }
       
-      setDiagnosisResult(result);
+      setDiagnosisResult(imageAnalysisResult);
       
-      // 保存诊断日志
+      // 设置图片分析统计
+      const abnormalCount = imageAnalysisResult.severity === 'high' ? files.length : 
+                           imageAnalysisResult.severity === 'medium' ? Math.ceil(files.length * 0.6) :
+                           Math.ceil(files.length * 0.2);
+      
+      const imageStats: Statistics = {
+        totalFrames: files.length,
+        analyzedFrames: files.length,
+        abnormalFrames: abnormalCount,
+        abnormalRatio: abnormalCount / files.length,
+        duration: files.length * 3
+      };
+      setStatistics(imageStats);
+      
+      // 自动保存诊断日志
       await saveDiagnosisLog({
         type: files.length > 1 ? 'multi-image' : 'image',
-        files: files,
-        result: result
+        files,
+        result: imageAnalysisResult
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '图片分析失败');
+      
+    } catch (error) {
+      setError(error instanceof Error ? error.message : '分析失败');
+      console.error('图片分析错误:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  // 转换ImageInput的分析数据为DiagnosisResult格式
+  // 转换ImageInput的分析结果为标准格式
   const convertImageAnalysisToResult = (analysisData: any, files: File[]): DiagnosisResultType => {
-    const { detectedIssues, confidence, regions } = analysisData;
+    const { individualAnalyses, overallSummary, prioritizedSolutions } = analysisData;
     
-    // 查找相关知识
-    const relatedKnowledge = findMatchingKnowledge(detectedIssues);
+    // 统计所有异常
+    const allAnomalies = individualAnalyses.flatMap((analysis: any) => 
+      analysis.analysisResults.filter((result: any) => result.anomalyType !== 'normal')
+    );
     
-    // 确定故障类型
-    const faultType = determineFaultType(detectedIssues);
+    // 确定整体故障类型
+    let faultType = '设备状态正常';
+    let severity: 'low' | 'medium' | 'high' = 'low';
+    let confidence = 0.75;
+    
+    if (allAnomalies.length > 0) {
+      const severityCount = { low: 0, medium: 0, high: 0 };
+      allAnomalies.forEach((anomaly: any) => {
+        const sev = anomaly.severity as 'low' | 'medium' | 'high';
+        if (sev in severityCount) {
+          severityCount[sev]++;
+        }
+      });
+      
+      if (severityCount.high > 0) {
+        severity = 'high';
+        faultType = '发现严重设备故障';
+        confidence = 0.9;
+      } else if (severityCount.medium > 0) {
+        severity = 'medium';
+        faultType = '发现中等程度设备异常';
+        confidence = 0.85;
+      } else {
+        severity = 'low';
+        faultType = '发现轻微设备异常';
+        confidence = 0.8;
+      }
+    }
     
     // 生成解决方案
-    const solutions = generateSolutions(detectedIssues, relatedKnowledge);
+    const solutions = prioritizedSolutions?.map((sol: any) => sol.description) || [
+      '继续监控设备状态',
+      '按计划进行维护保养',
+      '记录设备运行参数'
+    ];
     
-    // 确定严重程度
-    const severity = determineSeverity(detectedIssues);
-    
-    // 生成描述
-    const description = generateDescription(files.length, detectedIssues, relatedKnowledge);
-
-    const commonIssues = ['腐蚀', '裂纹', '磨损', '过热', '变形', '污染'];
+    // 生成详细描述
+    const description = files.length > 1 ? 
+      `多图片智能分析完成：共分析${files.length}张图片，检测到${allAnomalies.length}个异常区域。${overallSummary || ''}` :
+      `单图片智能分析完成：${individualAnalyses[0]?.overallDescription || '图片分析完成，请查看详细结果。'}`;
     
     return {
       faultType,
-      severity,
       confidence,
+      solutions: solutions.slice(0, 5),
       description,
-      solutions,
-      timestamp: new Date().toISOString(),
-      analysisDetails: {
-        imageCount: files.length,
-        detectedIssues,
-        regions,
-        relatedKnowledge: relatedKnowledge.map(kb => ({
-          id: kb.id,
-          title: kb.title,
-          category: kb.category
-        })),
-        processingTime: Date.now() - (analysisData.startTime || Date.now())
-      }
+      severity
     };
   };
 
-  // 执行高级图片分析
+  // 高级图片分析算法，结合知识库
   const performAdvancedImageAnalysis = async (files: File[]): Promise<DiagnosisResultType> => {
-    // 模拟分析过程
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const analysisPromises = files.map(file => analyzeImageWithKnowledge(file));
+    const results = await Promise.all(analysisPromises);
     
-    const allDetectedIssues: string[] = [];
-    const allRegions: any[] = [];
+    // 综合分析结果
+    const allIssues = results.flatMap(r => r.detectedIssues);
+    const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
     
-    // 分析每个图片文件
-    for (const file of files) {
-      const analysisResult = await analyzeImageWithKnowledge(file);
-      allDetectedIssues.push(...analysisResult.detectedIssues);
-      allRegions.push(...analysisResult.regions);
-    }
+    // 根据检测到的问题匹配知识库
+    const matchedKnowledge = findMatchingKnowledge(allIssues);
     
-    // 去重检测到的问题
-    const uniqueIssues = [...new Set(allDetectedIssues)];
+    // 生成综合诊断
+    const faultType = determineFaultType(allIssues);
+    const solutions = generateSolutions(allIssues, matchedKnowledge);
+    const severity = determineSeverity(allIssues);
     
-    // 计算平均置信度
-    const avgConfidence = allDetectedIssues.length > 0 ? 
-      allDetectedIssues.length / (files.length * 4) : 0.1; // 假设每个图片最多检测4种问题
-    
-    return convertImageAnalysisToResult({
-      detectedIssues: uniqueIssues,
-      confidence: Math.min(avgConfidence, 0.95),
-      regions: allRegions
-    }, files);
+    return {
+      faultType,
+      confidence: avgConfidence,
+      solutions,
+      description: generateDescription(files.length, allIssues, matchedKnowledge),
+      severity
+    };
   };
 
-  // 使用知识库分析图片
+  // 基于知识库的图片分析
   const analyzeImageWithKnowledge = async (file: File): Promise<{
     detectedIssues: string[];
     confidence: number;
@@ -620,198 +666,146 @@ function App() {
     return new Promise((resolve) => {
       const img = new Image();
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d')!;
       
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0);
         
-        const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
-        if (imageData) {
-          const features = extractImageFeatures(imageData);
-          const detectedIssues: string[] = [];
-          const regions: any[] = [];
-          
-          // 腐蚀检测 (降低阈值提高敏感度)
-          if (features.redPixelRatio > 0.05) { // 从15%降低到5%
-            detectedIssues.push('腐蚀');
-            regions.push({
-              type: '腐蚀',
-              confidence: Math.min(features.redPixelRatio * 2, 0.95),
-              area: features.redPixelRatio * 100
-            });
-          }
-          
-          // 裂纹检测 (降低阈值)
-          if (features.darkPixelRatio > 0.15) { // 从30%降低到15%
-            detectedIssues.push('裂纹');
-            regions.push({
-              type: '裂纹',
-              confidence: Math.min(features.darkPixelRatio * 1.5, 0.9),
-              area: features.darkPixelRatio * 100
-            });
-          }
-          
-          // 磨损检测 (调整亮度阈值)
-          if (features.averageBrightness < 120) { // 从90提高到120
-            detectedIssues.push('磨损');
-            regions.push({
-              type: '磨损',
-              confidence: Math.min((120 - features.averageBrightness) / 120, 0.85),
-              area: 25
-            });
-          }
-          
-          // 过热检测 (新增)
-          if (features.redChannelAvg > 180 && features.redChannelAvg > features.greenChannelAvg + 30) {
-            detectedIssues.push('过热');
-            regions.push({
-              type: '过热',
-              confidence: Math.min((features.redChannelAvg - 150) / 100, 0.9),
-              area: 15
-            });
-          }
-          
-          // 如果没有检测到明显问题，进行更细致的分析
-          if (detectedIssues.length === 0) {
-            // 轻微异常检测
-            if (features.contrast < 50) {
-              detectedIssues.push('表面模糊');
-            }
-            if (features.redPixelRatio > 0.02) { // 更低的阈值
-              detectedIssues.push('轻微变色');
-            }
-          }
-          
-          const confidence = detectedIssues.length > 0 ? 
-            Math.min(0.6 + (detectedIssues.length * 0.1), 0.95) : 0.3;
-          
-          resolve({
-            detectedIssues,
-            confidence,
-            regions
-          });
-        } else {
-          resolve({
-            detectedIssues: [],
-            confidence: 0.1,
-            regions: []
-          });
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const issues = [];
+        let confidence = 0.7;
+        
+        // 智能特征检测
+        const features = extractImageFeatures(imageData);
+        
+        // 基于特征匹配故障模式
+        if (features.redRatio > 0.1) {
+          issues.push('腐蚀');
+          confidence += 0.15;
         }
+        if (features.darkLineRatio > 0.05) {
+          issues.push('裂纹');
+          confidence += 0.1;
+        }
+        if (features.brightSpotRatio > 0.08) {
+          issues.push('磨损');
+          confidence += 0.1;
+        }
+        if (features.temperatureVariation > 0.3) {
+          issues.push('过热');
+          confidence += 0.12;
+        }
+        
+        resolve({
+          detectedIssues: issues.length > 0 ? issues : ['正常'],
+          confidence: Math.min(confidence, 0.95),
+          regions: []
+        });
       };
       
       img.src = URL.createObjectURL(file);
     });
   };
 
-  // 提取图片特征
+  // 图像特征提取
   const extractImageFeatures = (imageData: ImageData) => {
-    const data = imageData.data;
-    const pixelCount = data.length / 4;
+    const pixels = imageData.data;
+    const totalPixels = imageData.width * imageData.height;
     
     let redPixels = 0;
-    let darkPixels = 0;
-    let totalBrightness = 0;
-    let redChannelSum = 0;
-    let greenChannelSum = 0;
-    let blueChannelSum = 0;
+    let darkLines = 0;
+    let brightSpots = 0;
+    let tempVariation = 0;
     
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      
-      // 计算亮度
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
       const brightness = (r + g + b) / 3;
-      totalBrightness += brightness;
       
-      // 统计各通道
-      redChannelSum += r;
-      greenChannelSum += g;
-      blueChannelSum += b;
+      // 红色（腐蚀）检测
+      if (r > g + 30 && r > b + 30 && r > 100) redPixels++;
       
-      // 检测红色像素（腐蚀迹象）
-      if (r > g + 30 && r > b + 30 && r > 100) {
-        redPixels++;
-      }
+      // 暗线（裂纹）检测
+      if (brightness < 50) darkLines++;
       
-      // 检测暗色像素（裂纹迹象）
-      if (brightness < 80) {
-        darkPixels++;
-      }
+      // 亮点（磨损）检测
+      if (brightness > 200) brightSpots++;
+      
+      // 温度变化检测（基于颜色变化）
+      if (Math.abs(r - g) > 40 || Math.abs(g - b) > 40) tempVariation++;
     }
     
     return {
-      redPixelRatio: redPixels / pixelCount,
-      darkPixelRatio: darkPixels / pixelCount,
-      averageBrightness: totalBrightness / pixelCount,
-      redChannelAvg: redChannelSum / pixelCount,
-      greenChannelAvg: greenChannelSum / pixelCount,
-      blueChannelAvg: blueChannelSum / pixelCount,
-      contrast: Math.abs(redChannelSum - blueChannelSum) / pixelCount
+      redRatio: redPixels / totalPixels,
+      darkLineRatio: darkLines / totalPixels,
+      brightSpotRatio: brightSpots / totalPixels,
+      temperatureVariation: tempVariation / totalPixels
     };
   };
 
-  // 查找匹配的知识
+  // 匹配知识库
   const findMatchingKnowledge = (issues: string[]): KnowledgeDocument[] => {
     return knowledgeDocuments.filter(doc => 
       issues.some(issue => 
-        doc.content.includes(issue) || 
-        doc.tags.some(tag => tag.includes(issue))
+        doc.tags.some(tag => tag.includes(issue)) ||
+        doc.content.includes(issue)
       )
     );
   };
 
   // 确定故障类型
   const determineFaultType = (issues: string[]): string => {
-    if (issues.includes('腐蚀') || issues.includes('过热')) return '电气故障';
-    if (issues.includes('裂纹') || issues.includes('磨损')) return '机械故障';
-    if (issues.length === 0) return '设备正常';
-    return '综合故障';
+    if (issues.includes('腐蚀')) return '设备腐蚀故障';
+    if (issues.includes('裂纹')) return '结构裂纹故障';
+    if (issues.includes('磨损')) return '机械磨损故障';
+    if (issues.includes('过热')) return '设备过热故障';
+    return '设备状态正常';
   };
 
   // 生成解决方案
   const generateSolutions = (issues: string[], knowledge: KnowledgeDocument[]): string[] => {
-    const solutions: string[] = [];
+    const solutions = [];
     
-    // 基于检测到的问题生成解决方案
     if (issues.includes('腐蚀')) {
-      solutions.push('清洁腐蚀部位并进行防腐处理');
-      solutions.push('检查环境湿度和通风情况');
+      solutions.push('立即清除腐蚀物质，重新涂抹防腐涂层');
+      solutions.push('检查环境湿度控制系统');
+      solutions.push('加强防水密封措施');
     }
     
     if (issues.includes('裂纹')) {
-      solutions.push('停止使用设备，进行结构强度检查');
-      solutions.push('联系专业人员进行裂纹修复');
+      solutions.push('停机检查，评估裂纹扩展风险');
+      solutions.push('进行无损检测，确定裂纹深度');
+      solutions.push('必要时更换受损部件');
     }
     
     if (issues.includes('磨损')) {
-      solutions.push('更换磨损部件');
-      solutions.push('调整设备运行参数');
-      solutions.push('增加润滑保养频次');
+      solutions.push('检查润滑系统，补充润滑油');
+      solutions.push('调整设备运行参数，减少磨损');
+      solutions.push('制定部件更换计划');
     }
     
     if (issues.includes('过热')) {
-      solutions.push('检查散热系统');
-      solutions.push('降低设备负载');
-      solutions.push('检查电气连接是否良好');
+      solutions.push('检查冷却系统运行状态');
+      solutions.push('清理散热器，确保通风良好');
+      solutions.push('监控负载，避免过载运行');
     }
     
-    // 基于知识库生成额外解决方案
+    // 从知识库补充解决方案
     knowledge.forEach(doc => {
-      if (doc.category === '维护保养') {
-        solutions.push('参考预防性维护流程进行保养');
+      if (doc.content.includes('处理') || doc.content.includes('解决')) {
+        const sentences = doc.content.split('。');
+        sentences.forEach(sentence => {
+          if (sentence.includes('检查') || sentence.includes('更换') || sentence.includes('清理')) {
+            solutions.push(sentence.trim());
+          }
+        });
       }
     });
     
-    // 如果没有检测到问题
-    if (issues.length === 0) {
-      solutions.push('设备状态良好，继续正常使用');
-      solutions.push('建议定期进行预防性检查');
-    }
-    
-    return [...new Set(solutions)]; // 去重
+    return solutions.length > 0 ? solutions.slice(0, 5) : ['设备状态良好，继续正常运行'];
   };
 
   // 确定严重程度
@@ -823,96 +817,49 @@ function App() {
 
   // 生成描述
   const generateDescription = (fileCount: number, issues: string[], knowledge: KnowledgeDocument[]): string => {
-    const fileText = fileCount > 1 ? `${fileCount}张图片` : '图片';
-    const issueText = issues.length > 0 ? issues.join('、') : '无明显异常';
-    const knowledgeText = knowledge.length > 0 ? `，结合${knowledge.length}个相关知识文档` : '';
-    
-    return `${fileText}分析完成。检测到：${issueText}${knowledgeText}，已生成相应的诊断建议。`;
-  };
-
-  // 处理音频录制
-  const handleAudioRecorded = async (audioFile: File) => {
-    await handleAudioAnalysis(audioFile);
-  };
-
-  // 处理帧捕获
-  const handleFrameCapture = (imageData: string) => {
-    // 处理视频帧捕获的逻辑
-  };
-
-  // 重置所有状态
-  const resetAll = () => {
-    setDiagnosisResult(null);
-    setError(null);
-    setLoading(false);
-    setStatistics({
-      totalFrames: 0,
-      analyzedFrames: 0,
-      abnormalFrames: 0,
-      abnormalRatio: 0,
-      duration: 0
-    });
-  };
-
-  // 处理输入类型切换时的状态清理
-  const handleInputTypeChange = (newType: typeof activeInput) => {
-    // 只有在切换到诊断相关功能时才清理结果
-    const diagnosticTypes = ['text', 'video', 'image', 'audio'];
-    const currentIsDiagnostic = diagnosticTypes.includes(activeInput);
-    const newIsDiagnostic = diagnosticTypes.includes(newType);
-    
-    if (currentIsDiagnostic && newIsDiagnostic && activeInput !== newType) {
-      clearDiagnosisResult();
+    const issueText = issues.filter(i => i !== '正常').join('、');
+    if (issueText) {
+      return `通过${fileCount}张图片的智能分析，检测到以下问题：${issueText}。基于知识库匹配了${knowledge.length}个相关文档，建议立即采取相应措施。`;
     }
-    
-    setActiveInput(newType);
+    return `经过${fileCount}张图片的全面分析，设备状态正常，未发现明显异常。建议继续定期监控。`;
   };
 
-  // 渲染活动组件
+
+
   const renderActiveComponent = () => {
     switch (activeInput) {
-      case 'text':
-        return <TextInput onAnalyze={handleTextAnalysis} />;
       case 'video':
-        return (
-          <VideoInput 
-            onAnalyze={handleVideoAnalysis}
-            onAudioRecorded={handleAudioRecorded}
-            onFrameCapture={handleFrameCapture}
-          />
-        );
+        return <VideoInput onVideoUpload={handleVideoAnalysis} />;
       case 'image':
-        return <ImageInput onAnalyze={handleImageUpload} />;
+        return <ImageInput onImageUpload={handleImageUpload} />;
       case 'audio':
-        return <AudioInput onAnalyze={handleAudioAnalysis} />;
+        return <AudioInput onAudioSubmit={handleAudioAnalysis} />;
       case 'material':
-        return (
-          <MaterialLibrary 
-            materials={materials}
-            onMaterialsChange={handleMaterialsChange}
-            onAddToKnowledgeBase={handleAddToKnowledgeBase}
-          />
-        );
+        return <MaterialLibrary
+          materials={materials}
+          onMaterialsChange={handleMaterialsChange}
+          onAddToKnowledgeBase={handleAddToKnowledgeBase}   
+          knowledgeDocuments={knowledgeDocuments}
+        />;
+      case 'graph':
+        return <KnowledgeGraph documents={knowledgeDocuments} />;
       case 'knowledge':
-        return (
-          <KnowledgeGraph 
-            documents={knowledgeDocuments}
-            onDocumentsChange={handleKnowledgeDocumentsChange}
-          />
-        );
+        return <KnowledgeGraph documents={knowledgeDocuments} />;
       case 'diagnosis':
-        return <SmartDiagnosis />;
+        return <SmartDiagnosis documents={knowledgeDocuments} />;
       case 'decision-tree':
-        return <DecisionTree />;
+        return <DecisionTree onComplete={(result) => {
+          console.log('决策树诊断完成:', result);
+        }} />;
       default:
-        return <TextInput onAnalyze={handleTextAnalysis} />;
+        return <TextInput onSubmit={handleTextAnalysis} />;
     }
   };
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Container maxWidth="xl" sx={{ py: 2 }}>
+      <Box sx={{ flexGrow: 1, minHeight: '100vh', bgcolor: 'grey.50' }}>
         <AppBar position="static" elevation={1}>
           <Toolbar>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 2 }}>
@@ -948,109 +895,195 @@ function App() {
           </Toolbar>
         </AppBar>
 
-        <Box sx={{ mt: 3 }}>
-          <Paper elevation={2} sx={{ p: 3 }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                  🔧 智能诊断工具
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Grid container spacing={3}>
+            {/* 侧边栏 */}
+            <Grid item xs={12} md={3}>
+              <Paper elevation={2} sx={{ p: 2, position: 'sticky', top: 20 }}>
+                <Typography variant="h6" gutterBottom>
+                  📊 系统概览
                 </Typography>
-                <ButtonGroup variant="outlined" sx={{ mb: 3, flexWrap: 'wrap', gap: 1 }}>
+                
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    总帧数: {statistics.totalFrames}     
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    已分析帧数: {statistics.analyzedFrames}      
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    异常帧数: {statistics.abnormalFrames}      
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    异常比例: {(statistics.abnormalRatio * 100).toFixed(1)}%     
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, fontWeight: 'bold' }}>
+                    诊断日志: {materials.filter(m => m.type === 'diagnosis').length}条
+                  </Typography>
+                </Box>
+
+                <Typography variant="h6" gutterBottom>
+                  🔧 诊断工具
+                </Typography>
+                <ButtonGroup orientation="vertical" fullWidth variant="outlined">
                   <Button
                     startIcon={<TextIcon />}
+                    onClick={() => {
+                      if (activeInput !== 'text') {
+                        setDiagnosisResult(null);
+                        setStatistics({
+                          totalFrames: 0,
+                          analyzedFrames: 0,
+                          abnormalFrames: 0,
+                          abnormalRatio: 0,
+                          duration: 0
+                        });
+                        setError(null);
+                        setAnalysisType('text');
+                      }
+                      setActiveInput('text');
+                    }}
                     variant={activeInput === 'text' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('text')}
                   >
                     文本诊断
                   </Button>
                   <Button
                     startIcon={<ImageIcon />}
+                    onClick={() => {
+                      if (activeInput !== 'image') {
+                        setDiagnosisResult(null);
+                        setStatistics({
+                          totalFrames: 0,
+                          analyzedFrames: 0,
+                          abnormalFrames: 0,
+                          abnormalRatio: 0,
+                          duration: 0
+                        });
+                        setError(null);
+                        setAnalysisType('image');
+                      }
+                      setActiveInput('image');
+                    }}
                     variant={activeInput === 'image' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('image')}
                   >
                     图片诊断
                   </Button>
                   <Button
                     startIcon={<VideoIcon />}
+                    onClick={() => {
+                      if (activeInput !== 'video') {
+                        setDiagnosisResult(null);
+                        setStatistics({
+                          totalFrames: 0,
+                          analyzedFrames: 0,
+                          abnormalFrames: 0,
+                          abnormalRatio: 0,
+                          duration: 0
+                        });
+                        setError(null);
+                        setAnalysisType('video');
+                      }
+                      setActiveInput('video');
+                    }}
                     variant={activeInput === 'video' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('video')}
                   >
                     视频诊断
                   </Button>
                   <Button
                     startIcon={<AudioIcon />}
+                    onClick={() => {
+                      if (activeInput !== 'audio') {
+                        setDiagnosisResult(null);
+                        setStatistics({
+                          totalFrames: 0,
+                          analyzedFrames: 0,
+                          abnormalFrames: 0,
+                          abnormalRatio: 0,
+                          duration: 0
+                        });
+                        setError(null);
+                        setAnalysisType('audio');
+                      }
+                      setActiveInput('audio');
+                    }}
                     variant={activeInput === 'audio' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('audio')}
                   >
                     音频诊断
                   </Button>
                   <Button
                     startIcon={<DiagnosisIcon />}
+                    onClick={() => {
+                      if (activeInput !== 'diagnosis') {
+                        setDiagnosisResult(null);
+                        setStatistics({
+                          totalFrames: 0,
+                          analyzedFrames: 0,
+                          abnormalFrames: 0,
+                          abnormalRatio: 0,
+                          duration: 0
+                        });
+                        setError(null);
+                        setAnalysisType('text');
+                      }
+                      setActiveInput('diagnosis');
+                    }}
                     variant={activeInput === 'diagnosis' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('diagnosis')}
                   >
                     智能诊断
                   </Button>
                   <Button
                     startIcon={<MaterialIcon />}
+                    onClick={() => {
+                      // 素材库不需要清除诊断结果
+                      setActiveInput('material');
+                    }}
                     variant={activeInput === 'material' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('material')}
                   >
                     素材库
                   </Button>
                   <Button
                     startIcon={<KnowledgeIcon />}
+                    onClick={() => {
+                      // 知识图谱不需要清除诊断结果
+                      setActiveInput('knowledge');
+                    }}
                     variant={activeInput === 'knowledge' ? 'contained' : 'outlined'}
-                    onClick={() => handleInputTypeChange('knowledge')}
                   >
                     知识图谱
                   </Button>
                 </ButtonGroup>
-              </Grid>
+              </Paper>
+            </Grid>
 
-              <Grid item xs={12} md={diagnosisResult ? 6 : 12}>
-                <Paper elevation={1} sx={{ p: 2, minHeight: 400 }}>
-                  {renderActiveComponent()}
-                </Paper>
-              </Grid>
-
-              {diagnosisResult && (
-                <Grid item xs={12} md={6}>
-                  <Paper elevation={1} sx={{ p: 2, minHeight: 400 }}>
-                    <Typography variant="h6" gutterBottom sx={{ fontWeight: 'bold', color: 'secondary.main' }}>
-                      📊 诊断结果
-                    </Typography>
-                    <DiagnosisResult 
-                      result={diagnosisResult} 
-                      statistics={statistics}
-                      analysisType={analysisType}
-                    />
-                  </Paper>
-                </Grid>
-              )}
-
-              {loading && (
-                <Grid item xs={12}>
-                  <Box display="flex" justifyContent="center" alignItems="center" py={4}>
-                    <CircularProgress size={60} />
-                    <Typography variant="h6" sx={{ ml: 2 }}>
-                      正在分析中...
-                    </Typography>
+            {/* 主内容区域 */}
+            <Grid item xs={12} md={9}>
+              <Box sx={{ mb: 3 }}>
+                {loading && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                    <CircularProgress />
                   </Box>
-                </Grid>
-              )}
-
-              {error && (
-                <Grid item xs={12}>
-                  <Alert severity="error" sx={{ mt: 2 }}>
+                )}
+                
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
                     {error}
                   </Alert>
-                </Grid>
+                )}
+                
+                {renderActiveComponent()}
+              </Box>
+
+              {diagnosisResult && (
+                <DiagnosisResult
+                  result={diagnosisResult}
+                  statistics={statistics}
+                  analysisType={analysisType}
+                />
               )}
             </Grid>
-          </Paper>
-        </Box>
-      </Container>
+          </Grid>
+        </Container>
+      </Box>
 
       {/* 知识图谱对话框 */}
       {showKnowledgeGraph && (
@@ -1092,153 +1125,158 @@ function App() {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SettingsIcon />
-            系统设置
-          </Box>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SettingsIcon />
+          系统设置
         </DialogTitle>
         <DialogContent>
           <Box sx={{ py: 2 }}>
+            {/* Logo设置部分 */}
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PhotoIcon />
+              系统标识设置
+            </Typography>
+            <Divider sx={{ mb: 3 }} />
+            
             {/* 当前Logo显示 */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                当前标识
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, border: '1px solid #ddd', borderRadius: 1 }}>
-                <Avatar
-                  src={selectedLogo.startsWith('/') || selectedLogo.startsWith('data:') ? selectedLogo : undefined}
-                  sx={{ width: 48, height: 48 }}
-                  variant="rounded"
-                >
-                  {!selectedLogo.startsWith('/') && !selectedLogo.startsWith('data:') ? selectedLogo : '🔋'}
-                </Avatar>
-                <Box>
-                  <Typography variant="body1">
-                    {selectedLogo.startsWith('data:') ? '自定义标识' : 
-                     selectedLogo.startsWith('/') ? '默认标识' : selectedLogo}
-                  </Typography>
-                  <Chip 
-                    label={selectedLogo.startsWith('data:') ? '自定义标识' : '默认标识'} 
-                    size="small" 
-                                      color={selectedLogo.startsWith('data:') ? 'primary' : 'default'}
-                  />
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>当前标识</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                  <Avatar
+                    src={selectedLogo}
+                    sx={{ width: 60, height: 60 }}
+                    variant="rounded"
+                  >
+                    🔋
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      当前使用的系统标识
+                    </Typography>
+                    <Chip 
+                      label={selectedLogo.startsWith('data:') ? '自定义标识' : '默认标识'} 
+                      size="small" 
+                      color={selectedLogo.startsWith('data:') ? 'primary' : 'default'}
+                    />
+                  </Box>
                 </Box>
-              </Box>
-            </Box>
+              </CardContent>
+            </Card>
 
-            <Divider sx={{ my: 3 }} />
-
-            {/* 预设Logo选择 */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                预设标识
-              </Typography>
-              <Grid container spacing={2}>
-                {presetLogos.map((preset, index) => (
-                  <Grid item xs={6} sm={4} md={3} key={index}>
-                    <Card 
-                      sx={{ 
-                        cursor: 'pointer',
-                        border: selectedLogo === preset.path ? '2px solid #1976d2' : '1px solid #ddd',
-                        '&:hover': { boxShadow: 2 }
-                      }}
-                      onClick={() => handleLogoSelect(preset.path)}
-                    >
-                      <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                        <Avatar
-                          src={preset.path.startsWith('/') || preset.path.startsWith('data:') ? preset.path : undefined}
-                          sx={{ width: 40, height: 40, mx: 'auto', mb: 1 }}
-                          variant="rounded"
-                        >
-                          {!preset.path.startsWith('/') && !preset.path.startsWith('data:') ? preset.path : '🔋'}
-                        </Avatar>
-                        <Typography variant="body2">{preset.name}</Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-
-            <Divider sx={{ my: 3 }} />
-
-            {/* 自定义Logo上传 */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                自定义标识
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="logo-upload"
-                  type="file"
-                  onChange={handleCustomLogoUpload}
-                />
-                <label htmlFor="logo-upload">
+            {/* 上传新Logo */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>上传新标识</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <Button
-                    variant="outlined"
-                    component="span"
+                    variant="contained"
+                    component="label"
                     startIcon={<UploadIcon />}
-                    sx={{ mr: 2 }}
                   >
                     选择图片文件
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleCustomLogoUpload}
+                    />
                   </Button>
-                </label>
-                <Typography variant="body2" color="text.secondary">
-                  支持JPG、PNG、GIF格式，文件大小不超过2MB
-                </Typography>
-              </Box>
-
-              {/* 自定义Logo列表 */}
-              {customLogos.length > 0 && (
-                <Box>
-                  <Typography variant="subtitle1" gutterBottom>
-                    已上传的标识
+                  <Typography variant="body2" color="text.secondary">
+                    支持 JPG、PNG、GIF 格式，建议尺寸 120x40 像素
                   </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* 自定义Logo管理 */}
+            {customLogos.length > 0 && (
+              <Card>
+                <CardContent>
+                  <Typography variant="subtitle1" gutterBottom>自定义标识管理</Typography>
                   <Grid container spacing={2}>
                     {customLogos.map((logo) => (
-                      <Grid item xs={6} sm={4} md={3} key={logo.id}>
-                        <Card 
-                          sx={{ 
-                            border: selectedLogo === logo.path ? '2px solid #1976d2' : '1px solid #ddd',
-                            position: 'relative'
-                          }}
-                        >
-                          <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                            <Avatar
-                              src={logo.path}
-                              sx={{ width: 40, height: 40, mx: 'auto', mb: 1 }}
-                              variant="rounded"
-                            />
-                            <Typography variant="body2" noWrap>
-                              {logo.name}
-                            </Typography>
+                      <Grid item xs={12} sm={6} md={4} key={logo.id}>
+                        <Card variant="outlined">
+                          <CardContent sx={{ pb: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <Avatar
+                                src={logo.url}
+                                sx={{ width: 40, height: 40 }}
+                                variant="rounded"
+                              />
+                              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                                <Typography variant="body2" noWrap>
+                                  {logo.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {logo.size} | {logo.position}
+                                </Typography>
+                              </Box>
+                            </Box>
                           </CardContent>
-                          <CardActions sx={{ justifyContent: 'space-between', pt: 0 }}>
+                          <CardActions sx={{ pt: 0 }}>
                             <Button
                               size="small"
-                              onClick={() => handleLogoSelect(logo.path)}
-                              variant={selectedLogo === logo.path ? 'contained' : 'outlined'}
+                              onClick={() => handleLogoSelect(logo.url)}
+                              disabled={selectedLogo === logo.url}
                             >
-                              使用
+                              {selectedLogo === logo.url ? '当前使用' : '使用'}
                             </Button>
-                            <IconButton
+                            <Button
                               size="small"
-                              onClick={() => handleDeleteCustomLogo(logo.id)}
                               color="error"
+                              onClick={() => handleDeleteCustomLogo(logo.id)}
+                              startIcon={<DeleteIcon />}
                             >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                              删除
+                            </Button>
                           </CardActions>
                         </Card>
                       </Grid>
                     ))}
                   </Grid>
-                </Box>
-              )}
-            </Box>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 预设Logo选择 */}
+            <Card sx={{ mt: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>预设标识</Typography>
+                <Grid container spacing={2}>
+                  {[
+                    { path: '/logo.png', name: '默认标识' },
+                    { path: '🔋', name: '电池图标' },
+                    { path: '⚡', name: '闪电图标' },
+                    { path: '🔧', name: '工具图标' }
+                  ].map((preset) => (
+                    <Grid item xs={6} sm={3} key={preset.path}>
+                      <Card 
+                        variant="outlined" 
+                        sx={{ 
+                          cursor: 'pointer',
+                          border: selectedLogo === preset.path ? 2 : 1,
+                          borderColor: selectedLogo === preset.path ? 'primary.main' : 'divider'
+                        }}
+                        onClick={() => handleLogoSelect(preset.path)}
+                      >
+                        <CardContent sx={{ textAlign: 'center', py: 2 }}>
+                          <Avatar
+                            src={preset.path.startsWith('/') || preset.path.startsWith('data:') ? preset.path : undefined}
+                            sx={{ width: 40, height: 40, mx: 'auto', mb: 1 }}
+                            variant="rounded"
+                          >
+                            {!preset.path.startsWith('/') && !preset.path.startsWith('data:') ? preset.path : '🔋'}
+                          </Avatar>
+                          <Typography variant="body2">{preset.name}</Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </CardContent>
+            </Card>
           </Box>
         </DialogContent>
         <DialogActions>
@@ -1246,11 +1284,11 @@ function App() {
             关闭
           </Button>
           <Button 
+            variant="contained" 
             onClick={() => {
               setSettingsDialogOpen(false);
-              // 这里可以添加保存设置的逻辑
-            }} 
-            variant="contained" 
+              // 保存设置已经在选择时自动完成
+            }}
             startIcon={<SaveIcon />}
           >
             保存设置
@@ -1261,4 +1299,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; 
