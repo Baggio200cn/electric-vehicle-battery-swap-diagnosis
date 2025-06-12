@@ -26,7 +26,7 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
-    "@mui/x-charts": "^6.18.1",
+    "@mui/x-charts": "6.19.8",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
@@ -43,7 +43,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
+    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
+    "build:github": "cross-env NODE_OPTIONS=--max-old-space-size=4096 SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
     "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
     "build:production": "node build-no-eslint.js",
     "test": "react-scripts test",
@@ -75,3 +76,4 @@
     "cross-env": "^7.0.3"
   }
 }
+
