@@ -43,9 +43,9 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "build:ci": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
-    "ci:build": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
-    "build:production": "SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
+    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
+    "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
+    "build:production": "node build-no-eslint.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -70,5 +70,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
   }
 }
