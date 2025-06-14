@@ -180,4 +180,15 @@ export interface VideoInputProps {
 export interface DiagnosisResultProps {
   result: string;
   statistics?: Statistics;
+}
+
+// 知识库文档接口
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  createdAt: string;
+  relatedDocuments: string[];
 } 

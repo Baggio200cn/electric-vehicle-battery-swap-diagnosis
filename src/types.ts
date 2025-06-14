@@ -107,10 +107,11 @@ export interface CustomLogo {
   id: string;
   name: string;
   url: string;
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-  size: 'small' | 'medium' | 'large';
-  opacity: number;
-  path: string;
+  uploadDate: string;
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  size?: 'small' | 'medium' | 'large';
+  opacity?: number;
+  path?: string;
 }
 
 // 简化的材料项接口

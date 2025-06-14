@@ -43,29 +43,62 @@ export const analyzeAudio = async (audioBlob: Blob): Promise<DiagnosisResult> =>
 };
 
 export const analyzeText = async (text: string): Promise<TextAnalysisResponse> => {
-  // 模拟分析延迟
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  return {
-    analysis: {
-      faultType: '设备过热故障',
-      confidence: 0.85,
-      solutions: [
-        '检查冷却系统是否正常运行',
-        '检查设备通风口是否被堵塞',
-        '检查温度传感器读数',
-        '检查设备负载是否过重',
-        '联系专业技术人员进行详细检查'
-      ]
-    },
-    statistics: {
-      totalFrames: 1,
-      analyzedFrames: 1,
-      abnormalFrames: 1,
-      abnormalRatio: 1,
-      duration: 0
+  try {
+    // 调用DeepSeek API
+    const response = await fetch('http://localhost:5000/api/analyze-text', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || '文本分析失败');
     }
-  };
+
+    const data = await response.json();
+    
+    // 将DeepSeek API响应转换为前端期望的格式
+    return {
+      analysis: {
+        faultType: '智能诊断结果',
+        confidence: 0.95,
+        solutions: [
+          data.analysis || '请提供更详细的问题描述以获得更准确的诊断建议'
+        ]
+      },
+      statistics: {
+        totalFrames: 1,
+        analyzedFrames: 1,
+        abnormalFrames: data.success ? 0 : 1,
+        abnormalRatio: data.success ? 0 : 1,
+        duration: 0
+      }
+    };
+  } catch (error) {
+    console.error('文本分析错误:', error);
+    // 如果API调用失败，返回错误信息
+    return {
+      analysis: {
+        faultType: '诊断服务异常',
+        confidence: 0.0,
+        solutions: [
+          '诊断服务暂时不可用，请稍后重试',
+          '请检查网络连接',
+          '如问题持续，请联系技术支持'
+        ]
+      },
+      statistics: {
+        totalFrames: 1,
+        analyzedFrames: 0,
+        abnormalFrames: 1,
+        abnormalRatio: 1,
+        duration: 0
+      }
+    };
+  }
 };
 
 export const analyzeVideoFrame = async (frame: ImageData): Promise<FrameAnalysisResponse> => {

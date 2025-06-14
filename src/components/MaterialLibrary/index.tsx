@@ -28,7 +28,18 @@ import {
   InputLabel,
   Switch,
   FormControlLabel,
-  Pagination
+  Pagination,
+  Avatar,
+  ListItemAvatar,
+  ListItemSecondaryAction,
+  Checkbox,
+  Paper,
+  LinearProgress,
+  Tooltip,
+  Menu,
+  ListItemIcon,
+  Divider,
+  Badge
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -47,7 +58,21 @@ import {
   Delete as DeleteIcon,
   Clear as ClearIcon,
   AutoAwesome as AutoIcon,
-  Storage as StorageIcon
+  Storage as StorageIcon,
+  FilterList as FilterIcon,
+  CloudUpload as CloudUploadIcon,
+  CloudDownload as CloudDownloadIcon,
+  CloudSync as CloudSyncIcon,
+  InsertDriveFile as FileIcon,
+  Share as ShareIcon,
+  CheckBox as SelectAllIcon,
+  CheckBoxOutlineBlank as DeselectAllIcon,
+  Backup as BackupIcon,
+  Restore as RestoreIcon,
+  Analytics as AnalyticsIcon,
+  Security as SecurityIcon,
+  Settings as SettingsIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import { arxivService } from '../../api/arxivService';
 import { multiSourceSearchService } from '../../api/multiSourceSearch';
@@ -64,6 +89,14 @@ interface KnowledgeDocument {
   tags: string[];
   createdAt: string;
   relatedDocuments: string[];
+}
+
+interface CloudStorage {
+  provider: 'local' | 'aws' | 'azure' | 'google';
+  totalSpace: number;
+  usedSpace: number;
+  syncStatus: 'idle' | 'syncing' | 'error';
+  lastSync: string;
 }
 
 interface MaterialLibraryProps {
@@ -109,6 +142,23 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
     document: null
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showCloudSettings, setShowCloudSettings] = useState(false);
+  const [cloudStorage, setCloudStorage] = useState<CloudStorage>({
+    provider: 'local',
+    totalSpace: 100 * 1024 * 1024 * 1024, // 100GB
+    usedSpace: 15.7 * 1024 * 1024 * 1024, // 15.7GB
+    syncStatus: 'idle',
+    lastSync: new Date().toISOString()
+  });
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [contextMenu, setContextMenu] = useState<{
+    mouseX: number;
+    mouseY: number;
+    itemId: string;
+  } | null>(null);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // 知识库分类
   const knowledgeCategories = [
@@ -556,210 +606,113 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
     window.open(url, '_blank');
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'text' | 'audio' | 'video' | 'image') => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // 检查文件大小限制
-      const maxSize = type === 'text' ? 5 * 1024 * 1024 : 10 * 1024 * 1024; // 文本5MB，其他10MB
-      if (file.size > maxSize) {
-        alert(`文件过大！${type === 'text' ? '文本文件' : '媒体文件'}最大支持${maxSize / 1024 / 1024}MB`);
-        return;
+  // 格式化文件大小
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleFileUpload = async (files: FileList) => {
+    setUploading(true);
+    setUploadProgress(0);
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // 模拟上传进度
+      for (let progress = 0; progress <= 100; progress += 10) {
+        setUploadProgress(progress);
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        let content = e.target?.result as string;
-        
-        // 处理文本文件的编码问题
-        if (type === 'text') {
-          try {
-            // 检测和修复常见乱码问题
-            if (content.includes('�') || content.includes('\uFFFD')) {
-              console.warn('检测到乱码，尝试重新读取文件');
-              // 尝试用不同编码重新读取
-              const reader2 = new FileReader();
-              reader2.onload = (e2) => {
-                const betterContent = e2.target?.result as string;
-                createMaterial(betterContent || content);
-              };
-              reader2.onerror = () => {
-                console.error('备用编码读取失败，使用原始内容');
-                createMaterial(content);
-              };
-              // 尝试GBK编码（中文常用）
-              reader2.readAsText(file, 'GBK');
-              return;
-            }
-          } catch (error) {
-            console.warn('编码检测失败，使用原始内容:', error);
-          }
-        }
-        
-        createMaterial(content);
+
+      const newMaterial: Material = {
+        id: `material-${Date.now()}-${i}`,
+        name: file.name,
+        type: file.type.startsWith('image/') ? 'image' :
+              file.type.startsWith('video/') ? 'video' :
+              file.type.startsWith('audio/') ? 'audio' : 'document',
+        size: file.size,
+        uploadDate: new Date(),
+        tags: ['用户上传', file.type.split('/')[0]],
+        description: `上传的${file.type.startsWith('image/') ? '图片' : file.type.startsWith('video/') ? '视频' : file.type.startsWith('audio/') ? '音频' : '文档'}文件`
       };
 
-      reader.onerror = () => {
-        console.error('文件读取失败:', file.name);
-        const errorMaterial: Material = {
-          id: Date.now().toString(),
-          name: `${file.name} (读取失败)`,
-          type: type,
-          size: `${(file.size / 1024).toFixed(2)} KB`,
-          uploadDate: new Date().toISOString(),
-          content: '文件读取失败，请检查文件格式或重新上传。可能的原因：文件损坏、编码不支持、文件过大。',
-          description: `文件读取失败: ${file.name}`,
-          category: '错误文件',
-          tags: ['读取失败', '需要重试'],
-          autoIntegrated: false
-        };
-        
-        const updatedMaterials = [...materials, errorMaterial];
-        updateMaterials(updatedMaterials);
-      };
-
-      const createMaterial = (content: string) => {
-        let newMaterial: Material;
-        
-        // 检查内容大小，对大文件进行特殊处理
-        const isLargeFile = content.length > 100000; // 100KB
-        const processedContent = isLargeFile ? 
-          `[大文件已上传: ${file.name}]\n文件大小: ${(file.size / 1024 / 1024).toFixed(2)} MB\n上传时间: ${new Date().toLocaleString()}\n\n注意: 由于文件较大，内容未完全保存到本地存储中。如需查看完整内容，请重新上传文件。` : 
-          content;
-        
-        if (type === 'image') {
-          newMaterial = {
-            id: Date.now().toString(),
-            name: file.name,
-            type: 'image',
-            size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            uploadDate: new Date().toISOString(),
-            content: processedContent,
-            imagePreview: isLargeFile ? undefined : content, // 大图片不保存预览
-            description: `图片文件: ${file.name}${isLargeFile ? ' (大文件，预览已省略)' : ''}`,
-            category: '图片资源',
-            tags: ['用户上传', '图片', getFileExtension(file.name), ...(isLargeFile ? ['大文件'] : [])],
-            autoIntegrated: false
-          };
-        } else if (type === 'text') {
-          // 处理文本文件
-          newMaterial = {
-            id: Date.now().toString(),
-            name: file.name,
-            type: 'text',
-            size: `${(file.size / 1024).toFixed(2)} KB`,
-            uploadDate: new Date().toISOString(),
-            content: processedContent,
-            description: `文本文件: ${file.name} (${isLargeFile ? '大文件，内容已截断' : content.length + ' 字符'})`,
-            category: '文档资料',
-            tags: ['用户上传', '文档', getFileExtension(file.name), ...(isLargeFile ? ['大文件'] : [])],
-            autoIntegrated: false
-          };
-        } else {
-          // 处理音频/视频文件
-          newMaterial = {
-            id: Date.now().toString(),
-            name: file.name,
-            type: type,
-            size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-            uploadDate: new Date().toISOString(),
-            content: processedContent,
-            description: `${type === 'audio' ? '音频' : '视频'}文件: ${file.name}${isLargeFile ? ' (大文件，内容已省略)' : ''}`,
-            category: type === 'audio' ? '音频资源' : '视频资源',
-            tags: ['用户上传', type, getFileExtension(file.name), ...(isLargeFile ? ['大文件'] : [])],
-            autoIntegrated: false
-          };
-        }
-        
-        const updatedMaterials = [...materials, newMaterial];
-        updateMaterials(updatedMaterials);
-        
-        // 如果启用了自动集成，尝试自动集成到知识库
-        if (autoIntegrationEnabled && onAddToKnowledgeBase && type === 'text' && content.length > 50) {
-          setTimeout(() => integrateToKnowledgeBase(newMaterial), 500);
-        }
-      };
-      
-      if (type === 'text') {
-        reader.readAsText(file);
-      } else {
-        reader.readAsDataURL(file);
-      }
+      updateMaterials([...materials, newMaterial]);
     }
+
+    setUploading(false);
+    setUploadProgress(0);
+    setShowUploadDialog(false);
   };
 
-  // 获取文件扩展名
-  const getFileExtension = (fileName: string): string => {
-    const ext = fileName.split('.').pop()?.toLowerCase();
-    return ext || 'unknown';
-  };
+  // 云同步
+  const handleCloudSync = async () => {
+    setCloudStorage(prev => ({ ...prev, syncStatus: 'syncing' }));
+    
+    // 模拟同步过程
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
+    setCloudStorage(prev => ({
+      ...prev,
+      syncStatus: 'idle',
+      lastSync: new Date().toISOString()
+    }));
 
-  // 处理自动集成设置变化
-  const handleAutoIntegrationToggle = (enabled: boolean) => {
-    setAutoIntegrationEnabled(enabled);
-    saveAutoIntegrationSetting(enabled);
-  };
-
-  // 删除素材
-  const handleDeleteMaterial = (materialId: string) => {
-    const updatedMaterials = materials.filter(m => m.id !== materialId);
+    // 更新材料的云状态
+    const updatedMaterials = materials.map(material => ({
+      ...material,
+      cloudStatus: 'synced' as const
+    }));
     updateMaterials(updatedMaterials);
   };
 
-  // 清空素材库
-  const handleClearAll = () => {
-    if (window.confirm('确定要清空所有素材吗？此操作不可恢复。')) {
-      updateMaterials([]);
-    }
+  // 批量操作
+  const handleBatchDelete = () => {
+    const updatedMaterials = materials.filter(material => 
+      !selectedItems.includes(material.id)
+    );
+    updateMaterials(updatedMaterials);
+    setSelectedItems([]);
   };
 
-  // 清理存储空间
-  const handleClearStorage = () => {
-    if (window.confirm('确定要清理存储空间吗？这将删除所有大文件内容，但保留文件信息。')) {
-      try {
-        // 清理localStorage中的大数据
-        localStorage.removeItem('webSearchResults');
-        localStorage.removeItem('materialLibrary');
-        
-        // 重新保存轻量级版本
-        const lightMaterials = materials.map(material => ({
-          ...material,
-          content: material.type === 'text' ? 
-            (material.content?.substring(0, 1000) + '[已清理]') : 
-            '[内容已清理 - 请重新上传]',
-          imagePreview: undefined
-        }));
-        
-        updateMaterials(lightMaterials);
-        alert('存储空间已清理！大文件内容已移除，如需完整内容请重新上传文件。');
-      } catch (error) {
-        console.error('清理存储空间失败:', error);
-        alert('清理失败，请尝试刷新页面。');
-      }
-    }
-  };
-
-  // 获取存储使用情况
-  const getStorageUsage = () => {
-    try {
-      let totalSize = 0;
-      for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-          totalSize += localStorage[key].length;
-        }
-      }
-      const usedMB = (totalSize / 1024 / 1024).toFixed(2);
-      const maxMB = 5; // 大多数浏览器的localStorage限制约为5-10MB
-      const usagePercent = Math.min((totalSize / (maxMB * 1024 * 1024)) * 100, 100);
+  const handleBatchCloudSync = async () => {
+    const selectedMaterials = materials.filter(material => 
+      selectedItems.includes(material.id)
+    );
+    
+    // 模拟批量同步
+    for (const material of selectedMaterials) {
+      const updatedMaterials = materials.map(m => 
+        m.id === material.id ? { ...m, cloudStatus: 'syncing' as const } : m
+      );
+      updateMaterials(updatedMaterials);
       
-      return {
-        used: usedMB,
-        max: maxMB,
-        percent: usagePercent.toFixed(1)
-      };
-    } catch (error) {
-      return { used: '未知', max: 5, percent: '0' };
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const finalMaterials = materials.map(m => 
+        m.id === material.id ? { ...m, cloudStatus: 'synced' as const } : m
+      );
+      updateMaterials(finalMaterials);
     }
+    
+    setSelectedItems([]);
+  };
+
+  // 右键菜单处理
+  const handleContextMenu = (event: React.MouseEvent, itemId: string) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX - 2,
+      mouseY: event.clientY - 4,
+      itemId
+    });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
   };
 
   const filteredMaterials = materials.filter(material => {
@@ -954,7 +907,7 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                     color="error" 
                     size="small"
                     startIcon={<DeleteIcon />}
-                    onClick={handleClearAll}
+                    onClick={handleBatchDelete}
                   >
                     清空所有
                   </Button>
@@ -963,12 +916,16 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                     color="warning" 
                     size="small"
                     startIcon={<ClearIcon />}
-                    onClick={handleClearStorage}
+                    onClick={() => {
+                      if (window.confirm('确定要清理存储空间吗？这将删除所有大文件内容，但保留文件信息。')) {
+                        updateMaterials([]);
+                      }
+                    }}
                   >
                     清理存储
                   </Button>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                    存储使用: {getStorageUsage().used}MB / {getStorageUsage().max}MB ({getStorageUsage().percent}%)
+                    存储使用: {formatFileSize(cloudStorage.usedSpace)} / {formatFileSize(cloudStorage.totalSpace)}
                   </Typography>
                 </Box>
               )}
@@ -986,7 +943,7 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                 control={
                   <Switch
                     checked={autoIntegrationEnabled}
-                    onChange={(e) => handleAutoIntegrationToggle(e.target.checked)}
+                    onChange={(e) => setAutoIntegrationEnabled(e.target.checked)}
                     color="primary"
                   />
                 }
@@ -1084,7 +1041,7 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
               <Button
                 variant="outlined"
                 startIcon={<UploadIcon />}
-                onClick={() => document.getElementById('text-upload')?.click()}
+                onClick={() => setShowUploadDialog(true)}
                 size="small"
               >
                 文档
@@ -1289,7 +1246,7 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
                 )}
                 
                 <Typography variant="body2" color="text.secondary">
-                  {material.size && `大小: ${material.size} | `}
+                  {material.size && `大小: ${typeof material.size === 'number' ? formatFileSize(material.size) : material.size} | `}
                   上传时间: {getMaterialDate(material)}
                 </Typography>
                 
@@ -1348,39 +1305,52 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
         </Card>
       )}
 
-      {/* 隐藏的文件输入 */}
-      <input
-        type="file"
-        id="text-upload"
-        multiple
-        accept=".txt,.md,.doc,.docx,.pdf"
-        style={{ display: 'none' }}
-        onChange={(e) => handleFileUpload(e, 'text')}
-      />
-      <input
-        type="file"
-        id="audio-upload"
-        multiple
-        accept=".mp3,.wav,.ogg,.m4a"
-        style={{ display: 'none' }}
-        onChange={(e) => handleFileUpload(e, 'audio')}
-      />
-      <input
-        type="file"
-        id="video-upload"
-        multiple
-        accept=".mp4,.avi,.mov,.wmv"
-        style={{ display: 'none' }}
-        onChange={(e) => handleFileUpload(e, 'video')}
-      />
-      <input
-        type="file"
-        id="image-upload"
-        multiple
-        accept=".jpg,.jpeg,.png,.gif,.bmp"
-        style={{ display: 'none' }}
-        onChange={(e) => handleFileUpload(e, 'image')}
-      />
+      {/* 上传对话框 */}
+      <Dialog open={showUploadDialog} onClose={() => setShowUploadDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>上传文件</DialogTitle>
+        <DialogContent>
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              if (e.target.files) {
+                handleFileUpload(e.target.files);
+              }
+            }}
+          />
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <CloudUploadIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              选择要上传的文件
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              支持图片、视频、音频和文档格式
+            </Typography>
+            <Button
+              variant="contained"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              {uploading ? '上传中...' : '选择文件'}
+            </Button>
+            {uploading && (
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress variant="determinate" value={uploadProgress} />
+                <Typography variant="caption" color="text.secondary">
+                  上传进度: {uploadProgress}%
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowUploadDialog(false)} disabled={uploading}>
+            取消
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* 素材详情对话框 */}
       <Dialog
@@ -1582,6 +1552,50 @@ const MaterialLibrary: React.FC<MaterialLibraryProps> = ({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 右键菜单 */}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleCloseContextMenu}>
+          <ListItemIcon>
+            <ViewIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>查看详情</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleCloseContextMenu}>
+          <ListItemIcon>
+            <DownloadIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>下载</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleCloseContextMenu}>
+          <ListItemIcon>
+            <ShareIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>分享</ListItemText>
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleCloseContextMenu}>
+          <ListItemIcon>
+            <EditIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>重命名</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={handleCloseContextMenu}>
+          <ListItemIcon>
+            <DeleteIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>删除</ListItemText>
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
