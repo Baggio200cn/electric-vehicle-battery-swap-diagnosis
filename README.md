@@ -356,4 +356,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [![GitHub stars](https://img.shields.io/github/stars/Baggio200cn/electric-vehicle-battery-swap-diagnosis?style=social)](https://github.com/Baggio200cn/electric-vehicle-battery-swap-diagnosis/stargazers)
 
 </div> 
-
