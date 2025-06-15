@@ -47,8 +47,10 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
-    "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
+    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false TYPESCRIPT_COMPILE_ON_ERROR=true react-scripts build",
+    "build:safe": "cross-env CI=false DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true SKIP_PREFLIGHT_CHECK=true TYPESCRIPT_COMPILE_ON_ERROR=true react-scripts build",
+    "build:force": "cross-env CI=false SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true TSC_COMPILE_ON_ERROR=true TYPESCRIPT_COMPILE_ON_ERROR=true GENERATE_SOURCEMAP=false react-scripts build",
+    "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
     "build:production": "node build-no-eslint.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

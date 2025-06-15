@@ -1,4 +1,4 @@
-import { DiagnosisResult, TextAnalysisResponse, VideoAnalysisResponse, Statistics } from '../types';
+import { DiagnosisResult, TextAnalysisResponse, VideoAnalysisResponse } from '../types';
 
 interface AudioAnalysisResponse {
   text: string;
