@@ -1,10 +1,12 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    "target": "es2015",
     "lib": [
       "dom",
       "dom.iterable",
-      "es6"
+      "es6",
+      "es2015",
+      "es2017"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -28,9 +30,8 @@
     "noImplicitOverride": false,
     "noPropertyAccessFromIndexSignature": false,
     "noUncheckedIndexedAccess": false,
-    "suppressImplicitAnyIndexErrors": true,
-    "suppressExcessPropertyErrors": true,
-    "skipDefaultLibCheck": true
+    "skipDefaultLibCheck": true,
+    "downlevelIteration": true
   },
   "include": [
     "src"
@@ -44,7 +45,8 @@
     "compilerOptions": {
       "strict": false,
       "skipLibCheck": true,
-      "allowJs": true
+      "allowJs": true,
+      "downlevelIteration": true
     }
   }
 } 
