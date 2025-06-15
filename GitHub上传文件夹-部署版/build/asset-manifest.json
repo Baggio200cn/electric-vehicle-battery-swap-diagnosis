@@ -1,0 +1,12 @@
+{
+  "files": {
+    "main.css": "/electric-vehicle-battery-swap-diagnosis/static/css/main.cb31100b.css",
+    "main.js": "/electric-vehicle-battery-swap-diagnosis/static/js/main.f047cafe.js",
+    "static/js/510.d46a2b47.chunk.js": "/electric-vehicle-battery-swap-diagnosis/static/js/510.d46a2b47.chunk.js",
+    "index.html": "/electric-vehicle-battery-swap-diagnosis/index.html"
+  },
+  "entrypoints": [
+    "static/css/main.cb31100b.css",
+    "static/js/main.f047cafe.js"
+  ]
+}
