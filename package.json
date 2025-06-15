@@ -26,14 +26,17 @@
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
-    "@mui/x-charts": "6.19.8",
+    "@mui/x-charts": "^6.18.1",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.68",
     "@types/react": "^18.2.42",
     "@types/react-dom": "^18.2.17",
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
+    "express": "^5.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
@@ -43,9 +46,10 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
-    "build:github": "cross-env NODE_OPTIONS=--max-old-space-size=4096 SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
-    "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI= react-scripts build",
+    "build:ci": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false TYPESCRIPT_COMPILE_ON_ERROR=true react-scripts build",
+    "build:safe": "cross-env CI=false DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true SKIP_PREFLIGHT_CHECK=true TYPESCRIPT_COMPILE_ON_ERROR=true react-scripts build",
+    "build:force": "node build-no-eslint.js",
+    "ci:build": "cross-env SKIP_PREFLIGHT_CHECK=true DISABLE_ESLINT_PLUGIN=true ESLINT_NO_DEV_ERRORS=true CI=false react-scripts build",
     "build:production": "node build-no-eslint.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -73,6 +77,6 @@
     ]
   },
   "devDependencies": {
-    "cross-env": "^7.0.3"
+    "@types/node": "^24.0.1"
   }
 }

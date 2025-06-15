@@ -6,8 +6,9 @@ import ImageInput from './components/ImageInput';
 import AudioInput from './components/AudioInput';
 import MaterialLibrary from './components/MaterialLibrary';
 import KnowledgeGraph from './components/KnowledgeGraph';
-import SmartDiagnosis from './components/SmartDiagnosis';
+import SmartDiagnosis from './components/SmartDiagnosis/index';
 import DecisionTree from './components/DecisionTree';
+import DeploymentManager from './components/DeploymentManager';
 import { analyzeText, analyzeVideo } from './api/faultAnalysis';
 import DiagnosisResult from './components/DiagnosisResult';
 import { 
@@ -32,13 +33,25 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-
   Card,
   CardContent,
   CardActions,
   Avatar,
   Chip,
-  Divider
+  Divider,
+  Tabs,
+  Tab,
+  Fab,
+  Tooltip,
+  Badge,
+  ListItemIcon,
+  ListItemText,
+  Switch,
+  FormControlLabel,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select
 } from '@mui/material';
 import { 
   Settings as SettingsIcon, 
@@ -53,28 +66,51 @@ import {
   Delete as DeleteIcon,
   Save as SaveIcon,
   Close as CloseIcon,
-  PhotoCamera as PhotoIcon
+  PhotoCamera as PhotoIcon,
+  Rocket as DeployIcon,
+  Dashboard as DashboardIcon,
+  Notifications as NotificationsIcon,
+  Person as PersonIcon,
+  ExitToApp as LogoutIcon,
+  Help as HelpIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon,
+  Assessment as AssessmentIcon,
+  Speed as SpeedIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { 
   DiagnosisResult as DiagnosisResultType, 
   Statistics,
   MaterialItem,
-  CustomLogo
+  CustomLogo,
+  KnowledgeDocument
 } from './types';
+import SystemDashboard from './components/SystemDashboard';
+import UserSettings from './components/UserSettings';
+import NotificationCenter from './components/NotificationCenter';
+import PerformanceMonitor from './components/PerformanceMonitor';
+import AdvancedSearch from './components/AdvancedSearch';
+import DataAnalytics from './components/DataAnalytics';
 
-// 知识库文档接口
-interface KnowledgeDocument {
+// 通知接口
+interface Notification {
   id: string;
+  type: 'info' | 'warning' | 'error' | 'success';
   title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  createdAt: string;
-  relatedDocuments: string[];
+  message: string;
+  timestamp: Date;
+  read: boolean;
+  category: 'system' | 'security' | 'update' | 'user' | 'diagnosis';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  actionable: boolean;
+  actionText?: string;
+  actionUrl?: string;
+  source: string;
 }
 
 function App() {
-  const [activeInput, setActiveInput] = useState<'text' | 'video' | 'image' | 'audio' | 'material' | 'knowledge' | 'graph' | 'diagnosis' | 'decision-tree'>('text');
+  const [activeInput, setActiveInput] = useState<'text' | 'video' | 'image' | 'audio' | 'material' | 'knowledge' | 'graph' | 'diagnosis' | 'decision-tree' | 'deployment' | 'dashboard'>('text');
   const [diagnosisResult, setDiagnosisResult] = useState<DiagnosisResultType | null>(null);
   const [statistics, setStatistics] = useState<Statistics>({
     totalFrames: 0,
@@ -104,7 +140,55 @@ function App() {
   const [knowledgeDocuments, setKnowledgeDocuments] = useState<KnowledgeDocument[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
   const [showKnowledgeGraph, setShowKnowledgeGraph] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([
+    {
+      id: '1',
+      type: 'warning',
+      title: 'CPU使用率过高',
+      message: '当前CPU使用率达到85%，建议检查系统负载',
+      timestamp: new Date(Date.now() - 300000),
+      read: false,
+      category: 'system',
+      priority: 'high',
+      actionable: true,
+      actionText: '查看详情',
+      source: '性能监控'
+    },
+    {
+      id: '2',
+      type: 'info',
+      title: '系统更新可用',
+      message: '检测到新的系统更新版本 v2.1.3',
+      timestamp: new Date(Date.now() - 3600000),
+      read: false,
+      category: 'update',
+      priority: 'medium',
+      actionable: true,
+      actionText: '立即更新',
+      source: '系统管理'
+    },
+    {
+      id: '3',
+      type: 'success',
+      title: '诊断任务完成',
+      message: '电池连接器故障诊断已完成，置信度92%',
+      timestamp: new Date(Date.now() - 7200000),
+      read: true,
+      category: 'diagnosis',
+      priority: 'low',
+      actionable: false,
+      source: '智能诊断'
+    }
+  ]);
   
+  // 新增组件状态
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [showPerformanceMonitor, setShowPerformanceMonitor] = useState(false);
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showDataAnalytics, setShowDataAnalytics] = useState(false);
+
   // 初始化知识库数据
   useEffect(() => {
     const initializeKnowledgeBase = () => {
@@ -409,10 +493,6 @@ function App() {
       second: '2-digit'
     }).format(date);
   };
-
-  // 这些函数已在上面重新定义，删除重复声明
-
-
 
   // 添加文档到知识库
   const handleAddToKnowledgeBase = (document: KnowledgeDocument) => {
@@ -829,8 +909,6 @@ function App() {
     return `经过${fileCount}张图片的全面分析，设备状态正常，未发现明显异常。建议继续定期监控。`;
   };
 
-
-
   const renderActiveComponent = () => {
     switch (activeInput) {
       case 'video':
@@ -856,6 +934,10 @@ function App() {
         return <DecisionTree onComplete={(result) => {
           console.log('决策树诊断完成:', result);
         }} />;
+      case 'deployment':
+        return <DeploymentManager />;
+      case 'dashboard':
+        return <SystemDashboard />;
       default:
         return <TextInput onSubmit={handleTextAnalysis} />;
     }
@@ -879,12 +961,76 @@ function App() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
               电动汽车换电站智能诊断系统
             </Typography>
-            <IconButton
-              color="inherit"
-              onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}
+            
+            {/* 通知按钮 */}
+            <Tooltip title="通知">
+              <IconButton 
+                color="inherit" 
+                sx={{ mr: 1 }}
+                onClick={() => setShowNotificationCenter(true)}
+              >
+                <Badge badgeContent={notifications.filter(n => !n.read).length} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+
+            {/* 用户菜单 */}
+            <Tooltip title="用户菜单">
+              <IconButton
+                color="inherit"
+                onClick={(e) => setUserMenuAnchor(e.currentTarget)}
+                sx={{ mr: 1 }}
+              >
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+                  <PersonIcon />
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+
+            {/* 设置按钮 */}
+            <Tooltip title="系统设置">
+              <IconButton
+                color="inherit"
+                onClick={(e) => setSettingsMenuAnchor(e.currentTarget)}
+              >
+                <SettingsIcon />
+              </IconButton>
+            </Tooltip>
+
+            {/* 用户菜单 */}
+            <Menu
+              anchorEl={userMenuAnchor}
+              open={Boolean(userMenuAnchor)}
+              onClose={() => setUserMenuAnchor(null)}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-              <SettingsIcon />
-            </IconButton>
+              <MenuItem onClick={() => {
+                setUserMenuAnchor(null);
+                setShowUserSettings(true);
+              }}>
+                <ListItemIcon>
+                  <PersonIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>个人设置</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => setUserMenuAnchor(null)}>
+                <ListItemIcon>
+                  <HelpIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>帮助中心</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => setUserMenuAnchor(null)}>
+                <ListItemIcon>
+                  <LogoutIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>退出登录</ListItemText>
+              </MenuItem>
+            </Menu>
+
+            {/* 设置菜单 */}
             <Menu
               anchorEl={settingsMenuAnchor}
               open={Boolean(settingsMenuAnchor)}
@@ -894,7 +1040,38 @@ function App() {
                 setSettingsMenuAnchor(null);
                 setSettingsDialogOpen(true);
               }}>
-                系统设置
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>系统设置</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={() => {
+                setSettingsMenuAnchor(null);
+                setShowDataAnalytics(true);
+              }}>
+                <ListItemIcon>
+                  <AssessmentIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>数据分析</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => {
+                setSettingsMenuAnchor(null);
+                setShowPerformanceMonitor(true);
+              }}>
+                <ListItemIcon>
+                  <SpeedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>性能监控</ListItemText>
+              </MenuItem>
+              <MenuItem onClick={() => {
+                setSettingsMenuAnchor(null);
+                setShowAdvancedSearch(true);
+              }}>
+                <ListItemIcon>
+                  <SearchIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText>高级搜索</ListItemText>
               </MenuItem>
             </Menu>
           </Toolbar>
@@ -1055,6 +1232,26 @@ function App() {
                     variant={activeInput === 'knowledge' ? 'contained' : 'outlined'}
                   >
                     知识图谱
+                  </Button>
+                  <Button
+                    startIcon={<DeployIcon />}
+                    onClick={() => {
+                      // 部署管理不需要清除诊断结果
+                      setActiveInput('deployment');
+                    }}
+                    variant={activeInput === 'deployment' ? 'contained' : 'outlined'}
+                  >
+                    部署管理
+                  </Button>
+                  <Button
+                    startIcon={<DashboardIcon />}
+                    onClick={() => {
+                      // 系统仪表盘不需要清除诊断结果
+                      setActiveInput('dashboard');
+                    }}
+                    variant={activeInput === 'dashboard' ? 'contained' : 'outlined'}
+                  >
+                    系统仪表盘
                   </Button>
                 </ButtonGroup>
               </Paper>
@@ -1300,6 +1497,42 @@ function App() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* 用户设置对话框 */}
+      <UserSettings
+        open={showUserSettings}
+        onClose={() => setShowUserSettings(false)}
+      />
+
+      {/* 通知中心 */}
+      <NotificationCenter
+        open={showNotificationCenter}
+        onClose={() => setShowNotificationCenter(false)}
+        notifications={notifications}
+        onNotificationUpdate={setNotifications}
+      />
+
+      {/* 性能监控 */}
+      <PerformanceMonitor
+        open={showPerformanceMonitor}
+        onClose={() => setShowPerformanceMonitor(false)}
+      />
+
+      {/* 高级搜索 */}
+      <AdvancedSearch
+        open={showAdvancedSearch}
+        onClose={() => setShowAdvancedSearch(false)}
+        onSearch={async (query, filters) => {
+          // 模拟搜索功能
+          return [];
+        }}
+      />
+
+      {/* 数据分析仪表板 */}
+      <DataAnalytics
+        open={showDataAnalytics}
+        onClose={() => setShowDataAnalytics(false)}
+      />
     </ThemeProvider>
   );
 }

@@ -1,370 +1,482 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Card,
   CardContent,
+  Grid,
+  Tabs,
+  Tab,
   Button,
+  Chip,
+  LinearProgress,
+  Alert,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Avatar,
+  Divider,
+  Paper,
+  IconButton,
+  Tooltip,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
-  Alert,
-  Grid
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
-  AccountTree as GraphIcon,
+  Analytics as AnalyticsIcon,
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  Assessment as AssessmentIcon,
+  PieChart as PieChartIcon,
+  BarChart as BarChartIcon,
+  Timeline as TimelineIcon,
+  Insights as InsightsIcon,
+  Warning as WarningIcon,
+  CheckCircle as SuccessIcon,
+  Error as ErrorIcon,
   Info as InfoIcon,
-  Close as CloseIcon
+  Download as DownloadIcon,
+  Refresh as RefreshIcon,
+  Settings as SettingsIcon,
+  FilterList as FilterIcon,
+  DateRange as DateRangeIcon,
+  Speed as PerformanceIcon,
+  BugReport as FaultIcon,
+  BatteryFull as BatteryIcon,
+  ElectricBolt as ElectricIcon,
+  Build as MechanicalIcon,
+  Security as SafetyIcon
 } from '@mui/icons-material';
 
-interface KnowledgeDocument {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  createdAt: string;
-  relatedDocuments: string[];
-}
-
-interface GraphNode {
-  id: string;
-  label: string;
-  category: string;
-  x: number;
-  y: number;
-  connections: string[];
-}
-
-interface GraphConnection {
-  from: string;
-  to: string;
-  strength: number;
-}
-
-interface KnowledgeGraphProps {
-  documents: KnowledgeDocument[];
-  onClose?: () => void;
-}
-
-const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ documents, onClose }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-  const [graphData, setGraphData] = useState<{
-    nodes: GraphNode[];
-    connections: GraphConnection[];
-  }>({ nodes: [], connections: [] });
-
-  // 分类颜色映射
-  const categoryColors: { [key: string]: string } = {
-    '系统概述': '#FF6B35',
-    '机械故障': '#4CAF50', 
-    '电气故障': '#2196F3',
-    '安全系统': '#F44336',
-    '电池系统': '#9C27B0',
-    '维护保养': '#FF9800'
+interface AnalyticsData {
+  overview: {
+    totalDiagnoses: number;
+    successRate: number;
+    avgResponseTime: number;
+    activeIssues: number;
+    resolvedIssues: number;
+    criticalAlerts: number;
   };
+  trends: {
+    daily: Array<{ date: string; count: number; success: number }>;
+    weekly: Array<{ week: string; count: number; success: number }>;
+    monthly: Array<{ month: string; count: number; success: number }>;
+  };
+  faultDistribution: {
+    electrical: number;
+    mechanical: number;
+    battery: number;
+    safety: number;
+    software: number;
+  };
+  performanceMetrics: {
+    avgDiagnosisTime: number;
+    accuracyRate: number;
+    falsePositiveRate: number;
+    systemUptime: number;
+    userSatisfaction: number;
+  };
+  topIssues: Array<{
+    id: string;
+    type: string;
+    description: string;
+    frequency: number;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    trend: 'up' | 'down' | 'stable';
+  }>;
+  predictions: {
+    nextWeekIssues: number;
+    maintenanceNeeded: string[];
+    riskAreas: string[];
+    recommendations: string[];
+  };
+}
 
-  // 构建知识图谱数据
-  useEffect(() => {
-    if (documents.length === 0) return;
+interface DataAnalyticsProps {
+  open: boolean;
+  onClose: () => void;
+}
 
-    const nodes: GraphNode[] = documents.map((doc, index) => {
-      const angle = (index / documents.length) * 2 * Math.PI;
-      const radius = Math.min(250, 150 + documents.length * 3);
-      
-      return {
-        id: doc.id,
-        label: doc.title.length > 15 ? doc.title.substring(0, 15) + '...' : doc.title,
-        category: doc.category,
-        x: 400 + radius * Math.cos(angle),
-        y: 300 + radius * Math.sin(angle),
-        connections: doc.relatedDocuments
-      };
-    });
-
-    const connections: GraphConnection[] = [];
-    
-    // 简化连接逻辑，基于实际素材库内容
-    for (let i = 0; i < documents.length; i++) {
-      for (let j = i + 1; j < documents.length; j++) {
-        const doc1 = documents[i];
-        const doc2 = documents[j];
-        
-        // 计算连接强度 - 简化算法
-        let strength = 0;
-        
-        // 1. 相同分类的文档有基础连接
-        if (doc1.category === doc2.category) {
-          strength += 0.4;
-        }
-        
-        // 2. 标签重叠 - 每个共同标签增加0.2强度
-        const commonTags = doc1.tags.filter(tag => doc2.tags.includes(tag));
-        strength += Math.min(commonTags.length * 0.2, 0.6);
-        
-        // 3. 明确的相关文档引用
-        if (doc1.relatedDocuments.includes(doc2.id) || doc2.relatedDocuments.includes(doc1.id)) {
-          strength += 0.5;
-        }
-        
-        // 4. 内容关键词相似性 - 简化版本
-        const keywords1 = extractSimpleKeywords(doc1.content);
-        const keywords2 = extractSimpleKeywords(doc2.content);
-        const commonKeywords = keywords1.filter(kw => keywords2.includes(kw));
-        strength += Math.min(commonKeywords.length * 0.15, 0.3);
-        
-        // 只有当连接强度达到阈值时才创建连接，避免过于复杂的图谱
-        if (strength >= 0.4) {
-          connections.push({
-            from: doc1.id,
-            to: doc2.id,
-            strength: Math.min(strength, 1.0)
-          });
-        }
+const DataAnalytics: React.FC<DataAnalyticsProps> = ({ open, onClose }) => {
+  const [activeTab, setActiveTab] = useState(0);
+  const [timeRange, setTimeRange] = useState('7d');
+  const [loading, setLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+    overview: {
+      totalDiagnoses: 1247,
+      successRate: 94.2,
+      avgResponseTime: 2.3,
+      activeIssues: 12,
+      resolvedIssues: 1089,
+      criticalAlerts: 3
+    },
+    trends: {
+      daily: [
+        { date: '2024-01-08', count: 45, success: 42 },
+        { date: '2024-01-09', count: 52, success: 49 },
+        { date: '2024-01-10', count: 38, success: 36 },
+        { date: '2024-01-11', count: 61, success: 58 },
+        { date: '2024-01-12', count: 47, success: 44 },
+        { date: '2024-01-13', count: 55, success: 52 },
+        { date: '2024-01-14', count: 49, success: 46 }
+      ],
+      weekly: [],
+      monthly: []
+    },
+    faultDistribution: {
+      electrical: 35,
+      mechanical: 28,
+      battery: 22,
+      safety: 10,
+      software: 5
+    },
+    performanceMetrics: {
+      avgDiagnosisTime: 2.3,
+      accuracyRate: 94.2,
+      falsePositiveRate: 3.1,
+      systemUptime: 99.7,
+      userSatisfaction: 4.6
+    },
+    topIssues: [
+      {
+        id: '1',
+        type: '电气故障',
+        description: '电池连接器接触不良',
+        frequency: 23,
+        severity: 'high',
+        trend: 'up'
+      },
+      {
+        id: '2',
+        type: '机械故障',
+        description: '机械手臂定位偏差',
+        frequency: 18,
+        severity: 'medium',
+        trend: 'stable'
+      },
+      {
+        id: '3',
+        type: '电池故障',
+        description: 'BMS通信异常',
+        frequency: 15,
+        severity: 'high',
+        trend: 'down'
       }
+    ],
+    predictions: {
+      nextWeekIssues: 67,
+      maintenanceNeeded: ['机械手臂校准', '电池连接器清洁', '传感器检查'],
+      riskAreas: ['电气系统', '机械传动'],
+      recommendations: [
+        '增加电气系统巡检频率',
+        '优化机械手臂维护计划',
+        '升级BMS固件版本'
+      ]
     }
+  });
 
-    setGraphData({ nodes, connections });
-  }, [documents]);
-
-  // 简化的关键词提取
-  const extractSimpleKeywords = (content: string): string[] => {
-    const keywords = [
-      '电池', '充电', '机械', '传感器', '控制', '安全', '故障', '检测',
-      '维护', '温度', '电压', '电流', '通信', '报警', '监测', '诊断',
-      '系统', '设备', '连接器', '液压', '驱动', '手臂', 'BMS', '环境'
-    ];
-    
-    return keywords.filter(keyword => content.includes(keyword));
+  // 刷新数据
+  const refreshData = async () => {
+    setLoading(true);
+    // 模拟数据加载
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setLoading(false);
   };
 
-  // 绘制知识图谱
+  // 自动刷新
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || graphData.nodes.length === 0) return;
+    if (autoRefresh && open) {
+      const interval = setInterval(refreshData, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, open]);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // 清空画布
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 绘制连接线
-    graphData.connections.forEach(connection => {
-      const fromNode = graphData.nodes.find(n => n.id === connection.from);
-      const toNode = graphData.nodes.find(n => n.id === connection.to);
-      
-      if (fromNode && toNode) {
-        ctx.beginPath();
-        ctx.moveTo(fromNode.x, fromNode.y);
-        ctx.lineTo(toNode.x, toNode.y);
-        ctx.strokeStyle = `rgba(100, 100, 100, ${connection.strength * 0.6})`;
-        ctx.lineWidth = connection.strength * 3;
-        ctx.stroke();
-      }
-    });
-
-    // 绘制节点
-    graphData.nodes.forEach(node => {
-      const color = categoryColors[node.category] || '#757575';
-      
-      // 绘制节点圆圈
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, 25, 0, 2 * Math.PI);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // 绘制节点标签
-      ctx.fillStyle = '#333333';
-      ctx.font = '12px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(node.label, node.x, node.y + 45);
-    });
-
-  }, [graphData, categoryColors]);
-
-  // 处理画布点击
-  const handleCanvasClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-
-    // 检查是否点击了某个节点
-    const clickedNode = graphData.nodes.find(node => {
-      const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2);
-      return distance <= 25;
-    });
-
-    if (clickedNode) {
-      setSelectedNode(clickedNode);
-      setDetailDialogOpen(true);
+  // 获取趋势图标
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'up': return <TrendingUpIcon color="error" />;
+      case 'down': return <TrendingDownIcon color="success" />;
+      default: return <TimelineIcon color="info" />;
     }
   };
 
-  // 获取选中节点的文档详情
-  const getSelectedDocument = (): KnowledgeDocument | null => {
-    if (!selectedNode) return null;
-    return documents.find(doc => doc.id === selectedNode.id) || null;
+  // 获取严重程度颜色
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'critical': return 'error';
+      case 'high': return 'warning';
+      case 'medium': return 'info';
+      default: return 'success';
+    }
   };
+
+  // 渲染概览标签页
+  const renderOverview = () => (
+    <Grid container spacing={3}>
+      {/* 关键指标卡片 */}
+      <Grid item xs={12} md={6} lg={3}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
+                <AssessmentIcon />
+              </Avatar>
+              <Typography variant="h6">总诊断次数</Typography>
+            </Box>
+            <Typography variant="h4" color="primary">
+              {analyticsData.overview.totalDiagnoses.toLocaleString()}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              本月累计
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={6} lg={3}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar sx={{ bgcolor: 'success.main', mr: 2 }}>
+                <SuccessIcon />
+              </Avatar>
+              <Typography variant="h6">成功率</Typography>
+            </Box>
+            <Typography variant="h4" color="success.main">
+              {analyticsData.overview.successRate}%
+            </Typography>
+            <LinearProgress 
+              variant="determinate" 
+              value={analyticsData.overview.successRate} 
+              color="success"
+              sx={{ mt: 1 }}
+            />
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={6} lg={3}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar sx={{ bgcolor: 'info.main', mr: 2 }}>
+                <PerformanceIcon />
+              </Avatar>
+              <Typography variant="h6">平均响应时间</Typography>
+            </Box>
+            <Typography variant="h4" color="info.main">
+              {analyticsData.overview.avgResponseTime}s
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              系统响应速度
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      <Grid item xs={12} md={6} lg={3}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
+                <WarningIcon />
+              </Avatar>
+              <Typography variant="h6">活跃问题</Typography>
+            </Box>
+            <Typography variant="h4" color="warning.main">
+              {analyticsData.overview.activeIssues}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              待处理问题数
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* 故障分布图 */}
+      <Grid item xs={12} md={6}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PieChartIcon />
+              故障类型分布
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+              {Object.entries(analyticsData.faultDistribution).map(([type, count]) => {
+                const total = Object.values(analyticsData.faultDistribution).reduce((a, b) => a + b, 0);
+                const percentage = (count / total * 100).toFixed(1);
+                const getIcon = () => {
+                  switch (type) {
+                    case 'electrical': return <ElectricIcon />;
+                    case 'mechanical': return <MechanicalIcon />;
+                    case 'battery': return <BatteryIcon />;
+                    case 'safety': return <SafetyIcon />;
+                    default: return <FaultIcon />;
+                  }
+                };
+                const getLabel = () => {
+                  switch (type) {
+                    case 'electrical': return '电气故障';
+                    case 'mechanical': return '机械故障';
+                    case 'battery': return '电池故障';
+                    case 'safety': return '安全故障';
+                    default: return '软件故障';
+                  }
+                };
+                
+                return (
+                  <Box key={type} sx={{ mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {getIcon()}
+                        <Typography variant="body2">{getLabel()}</Typography>
+                      </Box>
+                      <Typography variant="body2" fontWeight="bold">
+                        {count} ({percentage}%)
+                      </Typography>
+                    </Box>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={parseFloat(percentage)} 
+                      sx={{ height: 8, borderRadius: 4 }}
+                    />
+                  </Box>
+                );
+              })}
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+
+      {/* 性能指标 */}
+      <Grid item xs={12} md={6}>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <PerformanceIcon />
+              性能指标
+            </Typography>
+            <List>
+              <ListItem>
+                <ListItemText 
+                  primary="平均诊断时间" 
+                  secondary={`${analyticsData.performanceMetrics.avgDiagnosisTime}秒`}
+                />
+                <Chip 
+                  label="优秀" 
+                  color="success" 
+                  size="small"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText 
+                  primary="准确率" 
+                  secondary={`${analyticsData.performanceMetrics.accuracyRate}%`}
+                />
+                <Chip 
+                  label="优秀" 
+                  color="success" 
+                  size="small"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText 
+                  primary="误报率" 
+                  secondary={`${analyticsData.performanceMetrics.falsePositiveRate}%`}
+                />
+                <Chip 
+                  label="良好" 
+                  color="info" 
+                  size="small"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemText 
+                  primary="系统正常运行时间" 
+                  secondary={`${analyticsData.performanceMetrics.systemUptime}%`}
+                />
+                <Chip 
+                  label="优秀" 
+                  color="success" 
+                  size="small"
+                />
+              </ListItem>
+            </List>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
+  );
 
   return (
-    <Box sx={{ p: 3, height: '100vh', overflow: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <GraphIcon />
-          电车换电故障排除知识图谱
-        </Typography>
-        {onClose && (
-          <Button variant="outlined" onClick={onClose} startIcon={<CloseIcon />}>
-            关闭
-          </Button>
-        )}
-      </Box>
-
-      {documents.length === 0 ? (
-        <Alert severity="warning">
-          请先生成知识库文档，然后才能查看知识图谱
-        </Alert>
-      ) : (
-        <>
-          <Alert severity="info" sx={{ mb: 3 }}>
-            点击图中的节点可以查看详细信息。节点颜色代表不同类别，连线粗细表示关联强度。
-          </Alert>
-
-          {/* 图例 */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>图例</Typography>
-              <Grid container spacing={2}>
-                {Object.entries(categoryColors).map(([category, color]) => (
-                  <Grid item key={category}>
-                    <Chip
-                      label={category}
-                      sx={{
-                        backgroundColor: color,
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            </CardContent>
-          </Card>
-
-          {/* 知识图谱画布 */}
-          <Card>
-            <CardContent>
-              <canvas
-                ref={canvasRef}
-                width={800}
-                height={600}
-                style={{
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  width: '100%',
-                  maxWidth: '800px'
-                }}
-                onClick={handleCanvasClick}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xl"
+      fullWidth
+      PaperProps={{
+        sx: { height: '90vh' }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AnalyticsIcon />
+          数据分析仪表板
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                size="small"
               />
-              
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                知识图谱显示了 {graphData.nodes.length} 个知识文档和 {graphData.connections.length} 个关联关系
-              </Typography>
-            </CardContent>
-          </Card>
-        </>
-      )}
+            }
+            label="自动刷新"
+          />
+          <Tooltip title="刷新数据">
+            <IconButton onClick={refreshData} disabled={loading}>
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="导出报告">
+            <IconButton onClick={() => setShowExportDialog(true)}>
+              <DownloadIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
+            <Tab label="概览" icon={<AssessmentIcon />} />
+            <Tab label="趋势分析" icon={<TimelineIcon />} />
+            <Tab label="预测分析" icon={<InsightsIcon />} />
+          </Tabs>
+        </Box>
 
-      {/* 节点详情对话框 */}
-      <Dialog
-        open={detailDialogOpen}
-        onClose={() => setDetailDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <InfoIcon />
-          {getSelectedDocument()?.title || '文档详情'}
-        </DialogTitle>
-        <DialogContent>
-          {getSelectedDocument() && (
-            <Box>
-              <Box sx={{ mb: 2 }}>
-                <Chip
-                  label={getSelectedDocument()!.category}
-                  sx={{
-                    backgroundColor: categoryColors[getSelectedDocument()!.category],
-                    color: 'white',
-                    mb: 1
-                  }}
-                />
-              </Box>
-              
-              <Typography variant="h6" gutterBottom>标签</Typography>
-              <Box sx={{ mb: 2 }}>
-                {getSelectedDocument()!.tags.map(tag => (
-                  <Chip key={tag} label={tag} size="small" sx={{ mr: 1, mb: 1 }} />
-                ))}
-              </Box>
-              
-              <Typography variant="h6" gutterBottom>相关文档</Typography>
-              <Box sx={{ mb: 2 }}>
-                {getSelectedDocument()!.relatedDocuments.map(rel => (
-                  <Chip 
-                    key={rel} 
-                    label={rel} 
-                    size="small" 
-                    variant="outlined" 
-                    sx={{ mr: 1, mb: 1 }} 
-                  />
-                ))}
-              </Box>
-              
-              <Typography variant="h6" gutterBottom>关联节点</Typography>
-              <Box>
-                {graphData.connections
-                  .filter(conn => conn.from === selectedNode?.id || conn.to === selectedNode?.id)
-                  .map(conn => {
-                    const relatedNodeId = conn.from === selectedNode?.id ? conn.to : conn.from;
-                    const relatedNode = graphData.nodes.find(n => n.id === relatedNodeId);
-                    const relatedDoc = documents.find(d => d.id === relatedNodeId);
-                    
-                    return relatedDoc ? (
-                      <Chip
-                        key={relatedNodeId}
-                        label={`${relatedDoc.title} (强度: ${(conn.strength * 100).toFixed(0)}%)`}
-                        size="small"
-                        sx={{ 
-                          mr: 1, 
-                          mb: 1,
-                          backgroundColor: categoryColors[relatedDoc.category],
-                          color: 'white'
-                        }}
-                      />
-                    ) : null;
-                  })}
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailDialogOpen(false)}>关闭</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+        {activeTab === 0 && renderOverview()}
+      </DialogContent>
+
+      <DialogActions>
+        <Button onClick={onClose}>关闭</Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
-export default KnowledgeGraph; 
+export default DataAnalytics; 
